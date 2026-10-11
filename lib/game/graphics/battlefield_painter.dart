@@ -618,6 +618,15 @@ class BattlefieldPainter extends CustomPainter {
           ..strokeCap = StrokeCap.round,
       );
     } else {
+      if (engine.hasExplicitAim) {
+        canvas.drawLine(
+          const Offset(22, 0),
+          const Offset(300, 0), // Linea guía larga
+          Paint()
+            ..color = role.themeColor.withValues(alpha: .3) // Transparente para no estorbar visualmente
+            ..strokeWidth = 1.0, // Línea fina
+        );
+      }
       canvas.drawLine(
         const Offset(22, 0),
         const Offset(48, 0),
