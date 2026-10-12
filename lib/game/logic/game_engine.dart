@@ -36,7 +36,6 @@ class GameEngine extends ChangeNotifier {
   Offset? buildPreviewPosition;
   int _pendingBuildCost = 0;
   bool _hasExplicitAim = false;
-  bool get hasExplicitAim => _hasExplicitAim;
   Offset? get objectivePosition => map.biome == MapBiomeType.snow
       ? townHall.position + const Offset(360, -240)
       : null;

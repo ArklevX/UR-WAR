@@ -147,7 +147,7 @@ class _VillageDefenseScreenState extends State<VillageDefenseScreen>
 
   void _assistAim() {
     Offset? nearest;
-    var distance = _engine.player.playerClass.attackRange + 65;
+    var distance = _engine.player.playerClass.attackRange + 120; // Increased radius for easier mobile targeting
     for (final position in [
       ..._engine.enemies.where((e) => !e.isDead).map((e) => e.position),
       ..._engine.rivalCamps.where((c) => !c.isDestroyed).map((c) => c.position),
@@ -610,10 +610,10 @@ class _VillageDefenseScreenState extends State<VillageDefenseScreen>
   Widget _controls(BoxConstraints constraints) {
     final scale = SaveSystem.data.controlScale;
     final radius =
-        (constraints.maxWidth * .13).clamp(36.0, 48.0) * scale.clamp(.8, 1.2);
+        (constraints.maxWidth * .15).clamp(42.0, 56.0) * scale.clamp(.8, 1.3);
     final leftHanded = SaveSystem.data.leftHanded;
     final player = _engine.player;
-    final buttonSize = (44.0 * scale).clamp(40.0, 52.0);
+    final buttonSize = (52.0 * scale).clamp(48.0, 64.0);
     final ultimateUnlocked = player.unlockedSkillIds.any(
       (id) => id.endsWith('_ultimate'),
     );
