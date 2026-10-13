@@ -15,6 +15,46 @@ class GameState extends ChangeNotifier {
     _initializeGame();
   }
 
+  Robot? get selectedRobot => robots
+      .where((robot) => robot.id == selectedRobotId && robot.hp > 0)
+      .firstOrNull;
+
+  Robot? get activePlayerRobot =>
+      selectedRobot ??
+      robots
+          .where((robot) => robot.id.startsWith('p') && robot.hp > 0)
+          .firstOrNull;
+
+  bool canMoveTo(int x, int y) {
+    final robot = selectedRobot;
+    if (isGameOver || robot == null || robot.actionPoints <= 0) return false;
+
+    final isOccupied = robots.any(
+      (other) => other.hp > 0 && other.x == x && other.y == y,
+    );
+    final distance = (robot.x - x).abs() + (robot.y - y).abs();
+    return !isOccupied && distance == 1;
+  }
+
+  bool canAttackAt(int x, int y) {
+    final robot = selectedRobot;
+    if (isGameOver || robot == null || robot.actionPoints <= 0) return false;
+
+    final enemy = robots
+        .where(
+          (other) =>
+              other.id.startsWith('e') &&
+              other.hp > 0 &&
+              other.x == x &&
+              other.y == y,
+        )
+        .firstOrNull;
+    if (enemy == null) return false;
+
+    final distance = (robot.x - x).abs() + (robot.y - y).abs();
+    return distance <= robot.attackRange;
+  }
+
   void _initializeGame() {
     robots = [
       Robot(

@@ -98,6 +98,11 @@ class GameScreen extends StatelessWidget {
                   final friendly = robot?.id.startsWith('p') ?? false;
                   final selected =
                       robot != null && robot.id == game.selectedRobotId;
+                  final moveTarget = game.canMoveTo(x, y);
+                  final attackTarget = game.canAttackAt(x, y);
+                  final targetColor = moveTarget
+                      ? const Color(0xFF94A480)
+                      : const Color(0xFFB36B57);
                   return Semantics(
                     button: true,
                     label:
@@ -105,7 +110,7 @@ class GameScreen extends StatelessWidget {
                             ? ''
                             : friendly
                             ? ', aliado'
-                            : ', enemigo'}',
+                            : ', enemigo'}${moveTarget ? ', movimiento disponible' : ''}${attackTarget ? ', objetivo de ataque' : ''}',
                     child: InkWell(
                       onTap: () => game.onCellTapped(x, y),
                       child: AnimatedContainer(
@@ -113,14 +118,20 @@ class GameScreen extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: selected
                               ? const Color(0xFF625539)
+                              : moveTarget
+                              ? const Color(0xFF344638)
+                              : attackTarget
+                              ? const Color(0xFF513630)
                               : (x + y) % 2 == 0
                               ? const Color(0xFF363D30)
                               : const Color(0xFF252B25),
                           border: Border.all(
                             color: selected
                                 ? AppTheme.primaryColor
+                                : moveTarget || attackTarget
+                                ? targetColor
                                 : const Color(0xFF454737),
-                            width: .7,
+                            width: moveTarget || attackTarget ? 2 : .7,
                           ),
                         ),
                         child: robot == null
@@ -194,6 +205,10 @@ class GameScreen extends StatelessWidget {
         ),
       ),
       const SizedBox(height: 8),
+      _actionPointsPanel(game),
+      const SizedBox(height: 8),
+      const _BoardLegend(),
+      const SizedBox(height: 8),
       Text(
         game.isGameOver
             ? game.winnerMessage
@@ -239,6 +254,102 @@ class GameScreen extends StatelessWidget {
       ),
     ],
   );
+
+  Widget _actionPointsPanel(GameState game) {
+    final robot = game.activePlayerRobot;
+    if (robot == null) return const SizedBox.shrink();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: .3),
+        border: Border.all(color: AppTheme.primaryColor.withValues(alpha: .6)),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  robot.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  'Puntos de acción: ${robot.actionPoints}',
+                  style: const TextStyle(color: AppTheme.muted, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Semantics(
+            label: '${robot.actionPoints} puntos de acción restantes',
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: List.generate(
+                3,
+                (index) => Padding(
+                  padding: const EdgeInsets.only(left: 4),
+                  child: Icon(
+                    Icons.bolt,
+                    size: 20,
+                    color: index < robot.actionPoints
+                        ? AppTheme.accentColor
+                        : AppTheme.muted.withValues(alpha: .35),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _direction(IconData icon, VoidCallback action) =>
       IconButton.filledTonal(onPressed: action, icon: Icon(icon, size: 26));
+}
+
+class _BoardLegend extends StatelessWidget {
+  const _BoardLegend();
+
+  @override
+  Widget build(BuildContext context) => Wrap(
+    alignment: WrapAlignment.center,
+    spacing: 14,
+    children: const [
+      _LegendItem(color: Color(0xFF94A480), label: 'Mover'),
+      _LegendItem(color: Color(0xFFB36B57), label: 'Atacar'),
+    ],
+  );
+}
+
+class _LegendItem extends StatelessWidget {
+  const _LegendItem({required this.color, required this.label});
+
+  final Color color;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Container(
+        width: 10,
+        height: 10,
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+      ),
+      const SizedBox(width: 5),
+      Text(label, style: const TextStyle(color: AppTheme.muted, fontSize: 11)),
+    ],
+  );
 }

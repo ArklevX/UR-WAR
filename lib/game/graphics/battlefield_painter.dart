@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import '../logic/game_engine.dart';
 import '../models/entity.dart';
@@ -14,6 +15,10 @@ import 'sprite_animation.dart';
 class BattlefieldPainter extends CustomPainter {
   final GameEngine engine;
   BattlefieldPainter({required this.engine}) : super(repaint: engine);
+  static const double _terrainChunkSize = 512;
+  static const int _maxCachedTerrainChunks = 36;
+  static final Map<(String, int, int), ui.Picture> _terrainChunks = {};
+
   Rect get view => Rect.fromLTWH(
     engine.cameraOffset.dx,
     engine.cameraOffset.dy,
@@ -107,6 +112,48 @@ class BattlefieldPainter extends CustomPainter {
 
   void _terrain(Canvas canvas) {
     final map = engine.map;
+    final firstColumn = max(0, (view.left / _terrainChunkSize).floor());
+    final firstRow = max(0, (view.top / _terrainChunkSize).floor());
+    final lastColumn = min(
+      (map.worldWidth / _terrainChunkSize).ceil() - 1,
+      (view.right / _terrainChunkSize).floor(),
+    );
+    final lastRow = min(
+      (map.worldHeight / _terrainChunkSize).ceil() - 1,
+      (view.bottom / _terrainChunkSize).floor(),
+    );
+
+    for (var row = firstRow; row <= lastRow; row++) {
+      for (var column = firstColumn; column <= lastColumn; column++) {
+        final key = (map.id, column, row);
+        final picture =
+            _terrainChunks.remove(key) ?? _createTerrainChunk(column, row);
+        _terrainChunks[key] = picture;
+        canvas.drawPicture(picture);
+      }
+    }
+
+    while (_terrainChunks.length > _maxCachedTerrainChunks) {
+      _terrainChunks.remove(_terrainChunks.keys.first)!.dispose();
+    }
+  }
+
+  ui.Picture _createTerrainChunk(int column, int row) {
+    final left = column * _terrainChunkSize;
+    final top = row * _terrainChunkSize;
+    final width = min(_terrainChunkSize, engine.map.worldWidth - left);
+    final height = min(_terrainChunkSize, engine.map.worldHeight - top);
+    final chunk = Rect.fromLTWH(left, top, width, height);
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder, Rect.fromLTWH(0, 0, width, height))
+      ..clipRect(Rect.fromLTWH(0, 0, width, height))
+      ..translate(-left, -top);
+    _drawTerrain(canvas, chunk);
+    return recorder.endRecording();
+  }
+
+  void _drawTerrain(Canvas canvas, Rect terrainBounds) {
+    final map = engine.map;
     final snow = map.biome == MapBiomeType.snow;
     final lava = map.biome == MapBiomeType.lava;
     final ground = snow
@@ -120,13 +167,21 @@ class BattlefieldPainter extends CustomPainter {
     );
     const tile = 74.0;
     for (
-      var y = max(0, (view.top / tile).floor());
-      y < min((map.worldHeight / tile).ceil(), (view.bottom / tile).ceil());
+      var y = max(0, (terrainBounds.top / tile).floor());
+      y <
+          min(
+            (map.worldHeight / tile).ceil(),
+            (terrainBounds.bottom / tile).ceil(),
+          );
       y++
     ) {
       for (
-        var x = max(0, (view.left / tile).floor());
-        x < min((map.worldWidth / tile).ceil(), (view.right / tile).ceil());
+        var x = max(0, (terrainBounds.left / tile).floor());
+        x <
+            min(
+              (map.worldWidth / tile).ceil(),
+              (terrainBounds.right / tile).ceil(),
+            );
         x++
       ) {
         final seed = ((x * 73856093) ^ (y * 19349663)).abs();
