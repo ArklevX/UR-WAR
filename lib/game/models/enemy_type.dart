@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../graphics/pixel_art_data.dart';
 
-enum EnemyCategory { goblin, orc, skeleton, necromancer, bossTitan }
+enum EnemyCategory { goblin, orc, troll, skeleton, necromancer, bossTitan }
 
 class EnemyConfig {
   final EnemyCategory category;
@@ -70,6 +70,24 @@ class EnemyConfig {
     isBoss: false,
     hitRadius: 28,
     sprite: PixelArtLibrary.orc,
+  );
+
+  static EnemyConfig get troll => EnemyConfig(
+    category: EnemyCategory.troll,
+    name: 'Troll de las Cavernas',
+    maxHealth: 320,
+    speed: 70,
+    attackDamage: 40,
+    attackRange: 44,
+    attackCooldownSeconds: 1.6,
+    goldReward: 60,
+    scoreReward: 120,
+    xpReward: 40,
+    isRanged: false,
+    isBoss: false,
+    hitRadius: 32,
+    sprite: PixelArtLibrary.troll,
+    healthBarColor: const Color(0xFF63B3ED),
   );
 
   static EnemyConfig get skeleton => EnemyConfig(

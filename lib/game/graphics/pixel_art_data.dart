@@ -355,6 +355,24 @@ class PixelArtLibrary {
   );
 
   // ==========================================
+  // ENEMIGO NUEVO: TROLL DE LAS CAVERNAS - 18x18
+  // (misma silueta que el orco, con piel azul grisácea)
+  // ==========================================
+  static final PixelSpriteData troll = PixelSpriteData(
+    visualId: 'troll',
+    width: orc.width,
+    height: orc.height,
+    palette: {
+      ...orc.palette,
+      'g': const Color(0xFF3B4F63), // Piel azul oscura
+      'G': const Color(0xFF6C8EA4), // Piel azul clara
+      'r': const Color(0xFF8E7CC3), // Marcas moradas
+      'e': const Color(0xFFFF6B35), // Ojos naranjas
+    },
+    matrix: orc.matrix,
+  );
+
+  // ==========================================
   // ENEMIGO 3: ESQUELETO TIRADOR - 16x16
   // ==========================================
   static final PixelSpriteData skeleton = PixelSpriteData(
