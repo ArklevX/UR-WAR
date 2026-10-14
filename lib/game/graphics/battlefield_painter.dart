@@ -19,6 +19,14 @@ class BattlefieldPainter extends CustomPainter {
   static const int _maxCachedTerrainChunks = 36;
   static final Map<(String, int, int), ui.Picture> _terrainChunks = {};
 
+  /// Clears cached terrain chunk pictures and disposes GPU resources.
+  static void clearCache() {
+    for (final picture in _terrainChunks.values) {
+      picture.dispose();
+    }
+    _terrainChunks.clear();
+  }
+
   Rect get view => Rect.fromLTWH(
     engine.cameraOffset.dx,
     engine.cameraOffset.dy,
@@ -78,6 +86,7 @@ class BattlefieldPainter extends CustomPainter {
       object.$2();
     }
     _projectiles(canvas);
+    final particlePaint = Paint();
     for (final p in engine.particles) {
       if (!visible(p.position)) continue;
       canvas.drawOval(
@@ -86,7 +95,7 @@ class BattlefieldPainter extends CustomPainter {
           width: p.radius * 2,
           height: p.radius * 2,
         ),
-        Paint()..color = p.color.withValues(alpha: p.opacity),
+        particlePaint..color = p.color.withValues(alpha: p.opacity),
       );
     }
     _fog(canvas);
@@ -757,6 +766,12 @@ class BattlefieldPainter extends CustomPainter {
   }
 
   void _projectiles(Canvas canvas) {
+    final trailPaint = Paint();
+    final glowPaint = Paint();
+    final fillPaint = Paint();
+    final highlightPaint = Paint()..color = const Color(0xFFFFE8B7);
+    final linePaint = Paint();
+
     for (final p in engine.projectiles) {
       if (!visible(p.position)) continue;
       final length = p.velocity.distance;
@@ -765,7 +780,7 @@ class BattlefieldPainter extends CustomPainter {
       canvas.drawLine(
         p.position - dir * 16,
         p.position,
-        Paint()
+        trailPaint
           ..color = p.color.withValues(alpha: .35)
           ..strokeWidth = p.radius * 2,
       );
@@ -773,19 +788,19 @@ class BattlefieldPainter extends CustomPainter {
         canvas.drawCircle(
           p.position,
           p.radius + 3,
-          Paint()..color = p.color.withValues(alpha: .25),
+          glowPaint..color = p.color.withValues(alpha: .25),
         );
-        canvas.drawCircle(p.position, p.radius, Paint()..color = p.color);
+        canvas.drawCircle(p.position, p.radius, fillPaint..color = p.color);
         canvas.drawCircle(
           p.position - const Offset(1, 1),
           p.radius * .4,
-          Paint()..color = const Color(0xFFFFE8B7),
+          highlightPaint,
         );
       } else {
         canvas.drawLine(
           p.position - dir * 9,
           p.position,
-          Paint()
+          linePaint
             ..color = p.color
             ..strokeWidth = 3,
         );
@@ -801,12 +816,17 @@ class BattlefieldPainter extends CustomPainter {
             p.position.dy - dir.dy * 3 - side.dy,
           )
           ..close();
-        canvas.drawPath(path, Paint()..color = p.color);
+        canvas.drawPath(path, fillPaint..color = p.color);
       }
     }
   }
 
   void _hazards(Canvas canvas) {
+    final fillPaint = Paint();
+    final strokePaint = Paint();
+    final arcPaint = Paint();
+    final linePaint = Paint();
+
     for (final h in engine.hazards) {
       if (!view.inflate(h.radius).contains(h.position)) continue;
       final warning = h.isWarning;
@@ -814,12 +834,12 @@ class BattlefieldPainter extends CustomPainter {
       canvas.drawCircle(
         h.position,
         h.radius,
-        Paint()..color = h.color.withValues(alpha: warning ? 0.13 : .22),
+        fillPaint..color = h.color.withValues(alpha: warning ? 0.13 : .22),
       );
       canvas.drawCircle(
         h.position,
         h.radius,
-        Paint()
+        strokePaint
           ..color = h.color.withValues(alpha: pulse)
           ..style = PaintingStyle.stroke
           ..strokeWidth = warning ? 2 : 4,
@@ -830,26 +850,25 @@ class BattlefieldPainter extends CustomPainter {
           -pi / 2,
           2 * pi * h.warningProgress,
           false,
-          Paint()
+          arcPaint
             ..color = h.color
             ..style = PaintingStyle.stroke
             ..strokeWidth = 5,
         );
         _label(canvas, h.isFriendly ? '+' : '!', h.position, h.color, size: 20);
       } else if (h.isFriendly) {
+        linePaint
+          ..color = h.color
+          ..strokeWidth = 3;
         canvas.drawLine(
           h.position - const Offset(7, 0),
           h.position + const Offset(7, 0),
-          Paint()
-            ..color = h.color
-            ..strokeWidth = 3,
+          linePaint,
         );
         canvas.drawLine(
           h.position - const Offset(0, 7),
           h.position + const Offset(0, 7),
-          Paint()
-            ..color = h.color
-            ..strokeWidth = 3,
+          linePaint,
         );
       }
     }
@@ -1020,13 +1039,17 @@ class BattlefieldPainter extends CustomPainter {
     }
   }
 
+  static final _shadowPaint = Paint()..color = Colors.black.withValues(alpha: .25);
+  static final _healthBgPaint = Paint()..color = const Color(0xFF101B25);
+  final _healthFillPaint = Paint();
+
   void _shadow(Canvas canvas, Offset p, double width) => canvas.drawOval(
     Rect.fromCenter(
       center: p + const Offset(0, 14),
       width: width,
       height: width * .3,
     ),
-    Paint()..color = Colors.black.withValues(alpha: .25),
+    _shadowPaint,
   );
 
   void _sprite(
@@ -1065,7 +1088,7 @@ class BattlefieldPainter extends CustomPainter {
         Rect.fromCenter(center: pos, width: width + 2, height: 6),
         const Radius.circular(3),
       ),
-      Paint()..color = const Color(0xFF101B25),
+      _healthBgPaint,
     );
     canvas.drawRRect(
       RRect.fromRectAndRadius(
@@ -1077,7 +1100,7 @@ class BattlefieldPainter extends CustomPainter {
         ),
         const Radius.circular(2),
       ),
-      Paint()..color = color,
+      _healthFillPaint..color = color,
     );
   }
 
