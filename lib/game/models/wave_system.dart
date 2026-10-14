@@ -57,6 +57,11 @@ class WaveSystem {
     if (wave >= 2) {
       roster.addAll(List.generate(1 + wave ~/ 2, (_) => EnemyConfig.orc));
     }
+    if (wave >= 3) {
+      roster.addAll(
+        List.generate(1 + (wave - 3) ~/ 2, (_) => EnemyConfig.troll),
+      );
+    }
     if (wave >= 3 && biome != MapBiomeType.snow) {
       roster.addAll(List.generate(wave ~/ 2, (_) => EnemyConfig.skeleton));
     }

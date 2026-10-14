@@ -114,7 +114,8 @@ class _Illustrator {
     final mage = id.startsWith('mage') || id == 'necromancer' || id == 'lich';
     final cleric = id == 'clericIdle';
     final goblin = id == 'goblin',
-        orc = id == 'orc',
+        troll = id == 'troll',
+        orc = id == 'orc' || id == 'troll',
         skeleton = id == 'skeleton';
     final boss = id == 'bossTitan', ghost = id == 'frostWraith';
     final npc = id.startsWith('npc');
@@ -130,6 +131,8 @@ class _Illustrator {
         ? const Color(0xFF819CA4)
         : boss
         ? const Color(0xFF5D5148)
+        : troll
+        ? const Color(0xFF5B7388)
         : orc
         ? const Color(0xFF556244)
         : goblin
