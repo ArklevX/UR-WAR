@@ -9,6 +9,8 @@ import 'package:ur_war/game/models/enemy_type.dart';
 import 'package:ur_war/game/models/entity.dart';
 import 'package:ur_war/game/models/game_map.dart';
 import 'package:ur_war/game/models/player_class.dart';
+import 'package:ur_war/game/widgets/battle_minimap.dart';
+import 'package:ur_war/game/widgets/game_over_dialog.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -119,6 +121,8 @@ void main() {
     expect(revived.health, EnemyConfig.goblin.maxHealth * 0.45);
     expect(revived.canBeRevived, isFalse);
     expect(engine.corpses, isEmpty);
+    expect(engine.enemiesRevived, 1);
+    expect(engine.hazards.single.type, 'necromancy');
   });
 
   test('Necromancer miniboss raises a diamond of skeleton guards', () {
@@ -145,6 +149,72 @@ void main() {
     expect(guards.every((guard) => guard.emergenceTimer > 0), isTrue);
     expect(guards.every((guard) => !guard.grantsReward), isTrue);
     expect(guards.every((guard) => !guard.canBeRevived), isTrue);
+    expect(engine.enemiesRevived, 4);
+    expect(
+      engine.hazards.where((hazard) => hazard.type == 'graveRise'),
+      hasLength(4),
+    );
+  });
+
+  test('Final titan alternates seismic strike and rolling rocks', () {
+    final titan = EnemyEntity(
+      id: 'final-titan',
+      config: EnemyConfig.bossTitan,
+      position: engine.player.position + const Offset(500, 0),
+    )..abilityTimer = 0;
+    engine.enemies.add(titan);
+
+    engine.update(.05);
+    expect(engine.hazards.any((hazard) => hazard.type == 'titanSlam'), isTrue);
+    expect(titan.vulnerableTimer, greaterThan(0));
+
+    titan.health = titan.maxHealth * .4;
+    titan.abilityTimer = 0;
+    engine.update(.05);
+    expect(titan.phase, 2);
+    expect(engine.rollingRocks, hasLength(5));
+    expect(engine.announcementBanner, contains('AVALANCHA'));
+  });
+
+  test('Rolling rocks damage the player and break on impact', () {
+    final health = engine.player.health;
+    engine.rollingRocks.add(
+      RollingRockEntity(
+        position: engine.player.position,
+        velocity: Offset.zero,
+        damage: 24,
+      ),
+    );
+
+    engine.update(.05);
+
+    expect(engine.player.health, health - 24);
+    expect(engine.damageTaken, 24);
+    expect(engine.rollingRocks, isEmpty);
+  });
+
+  test('Boss weak points amplify damage and contribute to result stats', () {
+    final enemy = EnemyEntity(
+      id: 'weak-target',
+      config: EnemyConfig.orc,
+      position: engine.player.position + const Offset(100, 0),
+    )..vulnerableTimer = 1;
+    engine.enemies.add(enemy);
+    final health = enemy.health;
+    engine.projectiles.add(
+      ProjectileEntity(
+        position: enemy.position,
+        velocity: Offset.zero,
+        damage: 10,
+        color: Colors.white,
+        isFromPlayer: true,
+      ),
+    );
+
+    engine.update(.05);
+
+    expect(enemy.health, health - 15);
+    expect(engine.damageDealt, 15);
   });
 
   test('Later waves apply progressive enemy scaling', () {
@@ -329,6 +399,31 @@ void main() {
   test(
     'BattlefieldPainter paints terrain and clearCache disposes resources cleanly',
     () {
+      for (final type in [
+        'titanSlam',
+        'iceStorm',
+        'lavaBurst',
+        'meteor',
+        'graveRise',
+      ]) {
+        engine.hazards.add(
+          HazardEntity(
+            position: engine.player.position,
+            radius: 80,
+            damage: 10,
+            color: Colors.purpleAccent,
+            type: type,
+            delay: 0,
+          ),
+        );
+      }
+      engine.rollingRocks.add(
+        RollingRockEntity(
+          position: engine.player.position,
+          velocity: const Offset(200, 0),
+          damage: 20,
+        ),
+      );
       final painter = BattlefieldPainter(engine: engine);
       final recorder = ui.PictureRecorder();
       final canvas = Canvas(recorder);
@@ -337,4 +432,62 @@ void main() {
       expect(() => BattlefieldPainter.clearCache(), returnsNormally);
     },
   );
+
+  testWidgets('Minimap renders role icons without adding a separate legend', (
+    tester,
+  ) async {
+    engine.enemies.addAll([
+      EnemyEntity(
+        id: 'map-ranged',
+        config: EnemyConfig.skeleton,
+        position: engine.player.position,
+      ),
+      EnemyEntity(
+        id: 'map-support',
+        config: EnemyConfig.necromancer,
+        position: engine.player.position + const Offset(10, 0),
+      ),
+      EnemyEntity(
+        id: 'map-boss',
+        config: EnemyConfig.bossTitan,
+        position: engine.player.position + const Offset(20, 0),
+      ),
+    ]);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: BattleMinimap(engine: engine)),
+      ),
+    );
+
+    expect(find.byType(BattleMinimap), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Battle results remain usable on a compact phone', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    engine.isVictory = true;
+    engine.completedWaves = engine.map.totalWaves;
+    engine.damageDealt = 1234;
+    engine.damageTaken = 120;
+    engine.enemiesRevived = 4;
+    engine.bossesDefeated = 1;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: GameOverDialog(engine: engine, onRestart: () {}, onExit: () {}),
+        ),
+      ),
+    );
+
+    expect(find.text('RESULTADOS DE BATALLA'), findsOneWidget);
+    expect(find.text('Jefes derrotados'), findsOneWidget);
+    expect(find.text('Enemigos resucitados'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }

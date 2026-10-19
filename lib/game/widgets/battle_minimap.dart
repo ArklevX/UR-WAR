@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../logic/game_engine.dart';
+import '../models/enemy_type.dart';
 
 class BattleMinimap extends StatelessWidget {
   final GameEngine engine;
@@ -9,7 +10,7 @@ class BattleMinimap extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Semantics(
     label:
-        'Minimapa: tú en blanco, aldea azul, campamentos rojos, objetivo dorado',
+        'Minimapa: tú en blanco, aldea azul, campamentos rojos e iconos enemigos por rol',
     child: IgnorePointer(
       child: Container(
         width: width,
@@ -79,11 +80,7 @@ class _MinimapPainter extends CustomPainter {
     for (final enemy in engine.enemies.where(
       (e) => !e.isDead && visible(e.position),
     )) {
-      canvas.drawCircle(
-        point(enemy.position),
-        1.4,
-        Paint()..color = Colors.orangeAccent,
-      );
+      _drawEnemyIcon(canvas, point(enemy.position), enemy.config);
     }
     canvas.drawRect(
       Rect.fromLTWH(
@@ -101,6 +98,54 @@ class _MinimapPainter extends CustomPainter {
       3,
       Paint()..color = Colors.white,
     );
+  }
+
+  void _drawEnemyIcon(Canvas canvas, Offset center, EnemyConfig config) {
+    if (config.isBoss) {
+      final path = Path()
+        ..moveTo(center.dx, center.dy - 4)
+        ..lineTo(center.dx + 4, center.dy)
+        ..lineTo(center.dx, center.dy + 4)
+        ..lineTo(center.dx - 4, center.dy)
+        ..close();
+      canvas.drawPath(path, Paint()..color = Colors.redAccent);
+      canvas.drawCircle(center, 1.2, Paint()..color = Colors.white);
+      return;
+    }
+    switch (config.behavior) {
+      case EnemyBehavior.support:
+        canvas.drawRect(
+          Rect.fromCenter(center: center, width: 2, height: 6),
+          Paint()..color = Colors.lightGreenAccent,
+        );
+        canvas.drawRect(
+          Rect.fromCenter(center: center, width: 6, height: 2),
+          Paint()..color = Colors.lightGreenAccent,
+        );
+        break;
+      case EnemyBehavior.siege:
+        canvas.drawRect(
+          Rect.fromCenter(center: center, width: 4, height: 4),
+          Paint()..color = Colors.deepOrangeAccent,
+        );
+        break;
+      case EnemyBehavior.rangedKiter:
+        final path = Path()
+          ..moveTo(center.dx, center.dy - 3)
+          ..lineTo(center.dx + 3, center.dy + 2.5)
+          ..lineTo(center.dx - 3, center.dy + 2.5)
+          ..close();
+        canvas.drawPath(path, Paint()..color = Colors.amberAccent);
+        break;
+      case EnemyBehavior.raider:
+      case EnemyBehavior.miniboss:
+        canvas.drawCircle(
+          center,
+          config.behavior == EnemyBehavior.miniboss ? 3 : 2,
+          Paint()..color = Colors.orangeAccent,
+        );
+        break;
+    }
   }
 
   @override

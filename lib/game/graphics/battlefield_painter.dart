@@ -85,6 +85,7 @@ class BattlefieldPainter extends CustomPainter {
     for (final object in objects) {
       object.$2();
     }
+    _rollingRocks(canvas);
     _projectiles(canvas);
     final particlePaint = Paint();
     for (final p in engine.particles) {
@@ -595,6 +596,24 @@ class BattlefieldPainter extends CustomPainter {
           ..strokeWidth = 2,
       );
     }
+    if (enemy.vulnerableTimer > 0) {
+      final pulse = .65 + sin(engine.elapsedTime * 12) * .25;
+      canvas.drawCircle(
+        enemy.position,
+        config.hitRadius + 11,
+        Paint()
+          ..color = const Color(0xFFFFD166).withValues(alpha: pulse)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 3,
+      );
+      _label(
+        canvas,
+        'PUNTO DÉBIL',
+        enemy.position - Offset(0, config.isBoss ? 98 : 53),
+        const Color(0xFFFFD166),
+        size: 9,
+      );
+    }
     if (enemy.health < enemy.maxHealth || config.isBoss) {
       _health(
         canvas,
@@ -845,6 +864,55 @@ class BattlefieldPainter extends CustomPainter {
     }
   }
 
+  void _rollingRocks(Canvas canvas) {
+    for (final rock in engine.rollingRocks) {
+      if (!visible(rock.position)) continue;
+      final direction = rock.velocity.distance > 0
+          ? rock.velocity / rock.velocity.distance
+          : const Offset(1, 0);
+      for (var index = 1; index <= 3; index++) {
+        canvas.drawCircle(
+          rock.position - direction * (index * 11.0),
+          max(2.0, rock.radius * (.42 - index * .08)),
+          Paint()
+            ..color = const Color(0xFFB08968).withValues(alpha: .22 / index),
+        );
+      }
+      canvas.drawOval(
+        Rect.fromCenter(
+          center: rock.position + Offset(0, rock.radius * .72),
+          width: rock.radius * 2.2,
+          height: rock.radius * .65,
+        ),
+        Paint()..color = Colors.black.withValues(alpha: .34),
+      );
+      canvas.save();
+      canvas.translate(rock.position.dx, rock.position.dy);
+      canvas.rotate(rock.rotation);
+      canvas.drawCircle(
+        Offset.zero,
+        rock.radius,
+        Paint()..color = const Color(0xFF6F5142),
+      );
+      final facet = Path()
+        ..moveTo(-rock.radius * .7, -rock.radius * .25)
+        ..lineTo(-rock.radius * .1, -rock.radius * .82)
+        ..lineTo(rock.radius * .72, -rock.radius * .2)
+        ..lineTo(rock.radius * .5, rock.radius * .65)
+        ..lineTo(-rock.radius * .55, rock.radius * .55)
+        ..close();
+      canvas.drawPath(facet, Paint()..color = const Color(0xFF9C7257));
+      canvas.drawLine(
+        Offset(-rock.radius * .6, 0),
+        Offset(rock.radius * .6, 0),
+        Paint()
+          ..color = const Color(0xFFD6B08A)
+          ..strokeWidth = 2,
+      );
+      canvas.restore();
+    }
+  }
+
   void _hazards(Canvas canvas) {
     final fillPaint = Paint();
     final strokePaint = Paint();
@@ -879,8 +947,8 @@ class BattlefieldPainter extends CustomPainter {
             ..style = PaintingStyle.stroke
             ..strokeWidth = 5,
         );
-        _label(canvas, h.isFriendly ? '+' : '!', h.position, h.color, size: 20);
-      } else if (h.isFriendly) {
+        _drawHazardWarning(canvas, h);
+      } else if (h.isFriendly && h.type == 'sanctuary') {
         linePaint
           ..color = h.color
           ..strokeWidth = 3;
@@ -894,8 +962,209 @@ class BattlefieldPainter extends CustomPainter {
           h.position + const Offset(0, 7),
           linePaint,
         );
+      } else {
+        _drawHazardImpact(canvas, h);
       }
     }
+  }
+
+  void _drawHazardWarning(Canvas canvas, HazardEntity hazard) {
+    final center = hazard.position;
+    final progress = hazard.warningProgress;
+    final paint = Paint()
+      ..color = hazard.color.withValues(alpha: .8)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3;
+    switch (hazard.type) {
+      case 'titanSlam':
+        for (var ray = 0; ray < 8; ray++) {
+          final angle = ray * pi / 4 + progress * .35;
+          final start = Offset(cos(angle), sin(angle)) * 13;
+          final end = Offset(cos(angle), sin(angle)) * hazard.radius * .82;
+          canvas.drawLine(center + start, center + end, paint);
+        }
+        _label(canvas, '⚡', center, hazard.color, size: 22);
+        break;
+      case 'iceStorm':
+        for (var ray = 0; ray < 6; ray++) {
+          final angle = ray * pi / 3 + engine.elapsedTime * .25;
+          final end = Offset(cos(angle), sin(angle)) * hazard.radius * .65;
+          canvas.drawLine(center, center + end, paint);
+          final branch = Offset(-sin(angle), cos(angle)) * 8;
+          canvas.drawLine(
+            center + end * .65,
+            center + end * .48 + branch,
+            paint,
+          );
+          canvas.drawLine(
+            center + end * .65,
+            center + end * .48 - branch,
+            paint,
+          );
+        }
+        break;
+      case 'meteor':
+        final altitude = 125 * (1 - progress);
+        final meteor = center + Offset(altitude * .48, -altitude);
+        canvas.drawLine(
+          meteor + const Offset(35, -70),
+          meteor,
+          Paint()
+            ..color = hazard.color.withValues(alpha: .45)
+            ..strokeWidth = 12
+            ..strokeCap = StrokeCap.round,
+        );
+        canvas.drawCircle(meteor, 13, Paint()..color = hazard.color);
+        canvas.drawCircle(
+          meteor - const Offset(3, 4),
+          5,
+          Paint()..color = Colors.white70,
+        );
+        break;
+      case 'lavaBurst':
+      case 'eruption':
+        for (var ray = 0; ray < 7; ray++) {
+          final angle = ray * 2 * pi / 7;
+          final start = center + Offset(cos(angle), sin(angle)) * 12;
+          final middle =
+              center +
+              Offset(cos(angle + .18), sin(angle + .18)) * hazard.radius * .5;
+          final end =
+              center + Offset(cos(angle), sin(angle)) * hazard.radius * .9;
+          canvas.drawPath(
+            Path()
+              ..moveTo(start.dx, start.dy)
+              ..lineTo(middle.dx, middle.dy)
+              ..lineTo(end.dx, end.dy),
+            paint,
+          );
+        }
+        break;
+      case 'necromancy':
+      case 'graveRise':
+      case 'soulLink':
+        _drawNecromancyRune(canvas, hazard, progress);
+        break;
+      default:
+        _label(
+          canvas,
+          hazard.isFriendly ? '+' : '!',
+          center,
+          hazard.color,
+          size: 20,
+        );
+        break;
+    }
+  }
+
+  void _drawHazardImpact(Canvas canvas, HazardEntity hazard) {
+    final center = hazard.position;
+    final progress = hazard.activeProgress;
+    final paint = Paint()
+      ..color = hazard.color.withValues(alpha: 1 - progress * .65)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 4;
+    switch (hazard.type) {
+      case 'titanSlam':
+        for (var ring = 1; ring <= 3; ring++) {
+          canvas.drawCircle(
+            center,
+            hazard.radius * progress * ring / 3,
+            paint..strokeWidth = 7 - ring.toDouble(),
+          );
+        }
+        break;
+      case 'ice':
+      case 'iceStorm':
+        for (var shard = 0; shard < 10; shard++) {
+          final angle = shard * pi / 5 + progress * .3;
+          final length = hazard.radius * (.25 + progress * .7);
+          final end = center + Offset(cos(angle), sin(angle)) * length;
+          canvas.drawLine(center, end, paint..strokeWidth = 2.5);
+          canvas.drawCircle(
+            end,
+            4 + progress * 3,
+            Paint()..color = hazard.color,
+          );
+        }
+        break;
+      case 'meteor':
+        canvas.drawCircle(
+          center,
+          hazard.radius * progress,
+          Paint()..color = hazard.color.withValues(alpha: .24 * (1 - progress)),
+        );
+        for (var flare = 0; flare < 12; flare++) {
+          final angle = flare * pi / 6;
+          final end =
+              center +
+              Offset(cos(angle), sin(angle)) * hazard.radius * progress;
+          canvas.drawLine(center, end, paint..strokeWidth = 5);
+        }
+        canvas.drawCircle(
+          center,
+          hazard.radius * (.25 + progress * .75),
+          paint..strokeWidth = 5,
+        );
+        break;
+      case 'lavaBurst':
+      case 'eruption':
+        for (var burst = 0; burst < 9; burst++) {
+          final angle = burst * 2 * pi / 9;
+          final end =
+              center +
+              Offset(cos(angle), sin(angle)) * hazard.radius * progress;
+          canvas.drawLine(center, end, paint..strokeWidth = 5);
+          canvas.drawCircle(
+            end,
+            4 + (1 - progress) * 5,
+            Paint()..color = hazard.color,
+          );
+        }
+        break;
+      case 'necromancy':
+      case 'graveRise':
+      case 'soulLink':
+        _drawNecromancyRune(canvas, hazard, progress);
+        break;
+      default:
+        canvas.drawCircle(center, hazard.radius * progress, paint);
+        break;
+    }
+  }
+
+  void _drawNecromancyRune(
+    Canvas canvas,
+    HazardEntity hazard,
+    double progress,
+  ) {
+    final paint = Paint()
+      ..color = hazard.color.withValues(alpha: .85)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.5;
+    canvas.save();
+    canvas.translate(hazard.position.dx, hazard.position.dy);
+    canvas.rotate(engine.elapsedTime * 1.8);
+    final radius = hazard.radius * (.72 + sin(engine.elapsedTime * 8) * .08);
+    final rune = Path();
+    for (var point = 0; point < 4; point++) {
+      final angle = -pi / 2 + point * pi / 2;
+      final p = Offset(cos(angle), sin(angle)) * radius;
+      if (point == 0) {
+        rune.moveTo(p.dx, p.dy);
+      } else {
+        rune.lineTo(p.dx, p.dy);
+      }
+    }
+    rune.close();
+    canvas.drawPath(rune, paint);
+    canvas.drawCircle(Offset.zero, radius * .52, paint);
+    canvas.drawLine(
+      Offset(0, radius * .45),
+      Offset(0, -radius * (.15 + progress * .55)),
+      paint..strokeWidth = 4,
+    );
+    canvas.restore();
   }
 
   void _objective(Canvas canvas) {
