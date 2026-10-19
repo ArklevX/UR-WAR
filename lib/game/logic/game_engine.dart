@@ -27,10 +27,16 @@ class GameEngine extends ChangeNotifier {
   final List<ProjectileEntity> projectiles = [];
   final List<FloatingTextEntity> floatingTexts = [];
   final List<ParticleEntity> particles = [];
+  final List<RollingRockEntity> rollingRocks = [];
   late WaveSystem waveSystem;
   final List<HazardEntity> hazards = [];
   final List<CorpseEntity> corpses = [];
   double elapsedTime = 0;
+  double damageDealt = 0;
+  double damageTaken = 0;
+  int buildingsLost = 0;
+  int enemiesRevived = 0;
+  int bossesDefeated = 0;
   int completedWaves = 0;
   double objectiveProgress = 0;
   int fortificationLevel = 0;
@@ -78,6 +84,24 @@ class GameEngine extends ChangeNotifier {
   int _enemyIdCounter = 0;
   int _buildingIdCounter = 0;
   final Random _random = Random();
+  final Set<String> _destroyedBuildingIds = {};
+
+  double get villageIntegrity =>
+      (townHall.health / townHall.maxHealth).clamp(0, 1);
+  int get resultStars {
+    if (!isVictory) return 0;
+    return 1 +
+        (villageIntegrity >= .5 ? 1 : 0) +
+        (villageIntegrity >= .8 ? 1 : 0);
+  }
+
+  String get resultRank => !isVictory
+      ? 'DEFENSA ROTA'
+      : resultStars == 3
+      ? 'GUARDIÁN LEGENDARIO'
+      : resultStars == 2
+      ? 'DEFENSOR VETERANO'
+      : 'SUPERVIVIENTE';
 
   GameEngine({required this.map, required this.playerClass}) {
     _initializeGame();
@@ -346,6 +370,10 @@ class GameEngine extends ChangeNotifier {
     final previousHealth = building.health;
     building.takeDamage(damage);
     if (building.health >= previousHealth) return;
+    if (building.isDead && _destroyedBuildingIds.add(building.id)) {
+      buildingsLost++;
+      AudioEngine.playRockImpact();
+    }
     _showTutorialHint(
       building == townHall
           ? const TutorialHint(
@@ -513,6 +541,7 @@ class GameEngine extends ChangeNotifier {
     }
     _updateRivalCamps(dt);
     _updateEnemies(dt);
+    _updateRollingRocks(dt);
     _updateVillageDefenses(dt);
     _updateProjectiles(dt);
     _updateHazards(dt);
@@ -561,15 +590,10 @@ class GameEngine extends ChangeNotifier {
         gold: player.gold,
         score: player.score,
       );
-      final integrity = townHall.health / townHall.maxHealth;
       SaveSystem.completeLevel(
         map.id,
         levelNumber: map.levelIndex,
-        stars: integrity >= 0.8
-            ? 3
-            : integrity >= 0.5
-            ? 2
-            : 1,
+        stars: resultStars,
         score: player.score,
       );
       showAnnouncement('¡VICTORIA! ALDEA DEFENDIDA Y TERRITORIO LIBERADO', 10);
@@ -1353,7 +1377,9 @@ class GameEngine extends ChangeNotifier {
                   direction.dy * player.aimDirection.dy) /
               direction.distance
         : 1.0;
+    final previousHealth = player.health;
     player.takeDamage(damage * (player.isBlocking && facing > 0.3 ? 0.25 : 1));
+    damageTaken += max(0, previousHealth - player.health);
     if (player.health > 0 && player.health <= player.maxHealth * .35) {
       _showTutorialHint(
         const TutorialHint(
@@ -1374,6 +1400,17 @@ class GameEngine extends ChangeNotifier {
         if (h.delay > 0) continue;
       }
       h.duration -= dt;
+      final visualOnly =
+          h.type == 'necromancy' ||
+          h.type == 'graveRise' ||
+          h.type == 'soulLink';
+      if (visualOnly) {
+        if (!h.triggered) {
+          h.triggered = true;
+          _spawnExplosionParticles(h.position, h.color, 10);
+        }
+        continue;
+      }
       if (h.type == 'trap' &&
           !enemies.any(
             (e) => !e.isDead && (e.position - h.position).distance <= h.radius,
@@ -1385,6 +1422,10 @@ class GameEngine extends ChangeNotifier {
       if (h.triggered && (!repeating || h.tickTimer > 0)) continue;
       h.triggered = true;
       h.tickTimer = 1;
+      if (!repeating) {
+        _spawnExplosionParticles(h.position, h.color, 14);
+        AudioEngine.playMagicImpact();
+      }
       if (h.isFriendly) {
         if (repeating) {
           if ((player.position - h.position).distance <= h.radius) {
@@ -1472,6 +1513,56 @@ class GameEngine extends ChangeNotifier {
     enemy.walkPhase += dt * 8;
     enemy.slowTimer = max(0, enemy.slowTimer - dt);
     enemy.emergenceTimer = max(0, enemy.emergenceTimer - dt);
+    enemy.vulnerableTimer = max(0, enemy.vulnerableTimer - dt);
+  }
+
+  void _updateRollingRocks(double dt) {
+    for (final rock in rollingRocks) {
+      rock.lifeTime -= dt;
+      if (rock.isExpired) continue;
+      rock.position += rock.velocity * dt;
+      rock.rotation += rock.velocity.distance * dt / rock.radius;
+
+      final outsideWorld =
+          rock.position.dx < -rock.radius ||
+          rock.position.dy < -rock.radius ||
+          rock.position.dx > map.worldWidth + rock.radius ||
+          rock.position.dy > map.worldHeight + rock.radius;
+      final hitObstacle = map.obstacles.any(
+        (obstacle) =>
+            (obstacle.position - rock.position).distance <=
+            obstacle.radius + rock.radius,
+      );
+      if (outsideWorld || hitObstacle) {
+        _breakRollingRock(rock);
+        continue;
+      }
+
+      if ((player.position - rock.position).distance <= rock.radius + 20) {
+        _hurtPlayer(rock.damage, rock.position);
+        _breakRollingRock(rock);
+        continue;
+      }
+      if (villageShieldTimer <= 0) {
+        for (final building in villageBuildings) {
+          if (building.isDead) continue;
+          if ((building.position - rock.position).distance <=
+              building.radius + rock.radius) {
+            _damageVillageBuilding(building, rock.damage);
+            _breakRollingRock(rock);
+            break;
+          }
+        }
+      }
+    }
+    rollingRocks.removeWhere((rock) => rock.isExpired);
+  }
+
+  void _breakRollingRock(RollingRockEntity rock) {
+    if (rock.isExpired) return;
+    rock.lifeTime = 0;
+    _spawnExplosionParticles(rock.position, const Color(0xFFB08968), 12);
+    AudioEngine.playRockImpact();
   }
 
   void _tryEnemyAbility(EnemyEntity enemy, double dt) {
@@ -1487,6 +1578,15 @@ class GameEngine extends ChangeNotifier {
       case EnemyAbility.areaStrike:
         _tryAreaStrike(enemy, dt);
         return;
+      case EnemyAbility.titanArsenal:
+        _tryTitanArsenal(enemy, dt);
+        return;
+      case EnemyAbility.frostStorm:
+        _tryElementalBossAbility(enemy, dt, frost: true);
+        return;
+      case EnemyAbility.lavaBurst:
+        _tryElementalBossAbility(enemy, dt, frost: false);
+        return;
     }
   }
 
@@ -1495,8 +1595,116 @@ class GameEngine extends ChangeNotifier {
     if (nextPhase > enemy.phase) {
       enemy.phase = nextPhase;
       showAnnouncement('¡${enemy.config.name} ENTRA EN FASE $nextPhase!', 3);
+      AudioEngine.playBossAbility();
       _spawnExplosionParticles(enemy.position, enemy.config.healthBarColor, 28);
     }
+  }
+
+  void _setBossCooldown(EnemyEntity enemy) {
+    final base = enemy.config.abilityCooldownSeconds > 0
+        ? enemy.config.abilityCooldownSeconds
+        : 6.0;
+    enemy.abilityTimer = enemy.phase == 2 ? max(3.5, base * .62) : base;
+  }
+
+  void _openBossWeakPoint(EnemyEntity enemy) {
+    enemy.vulnerableTimer = enemy.phase == 2 ? 2.2 : 2.8;
+    floatingTexts.add(
+      FloatingTextEntity(
+        position: enemy.position - const Offset(0, 95),
+        text: '¡PUNTO DÉBIL!',
+        color: const Color(0xFFFFD166),
+        fontSize: 15,
+      ),
+    );
+  }
+
+  void _tryTitanArsenal(EnemyEntity enemy, double dt) {
+    _updateBossPhase(enemy);
+    enemy.abilityTimer -= dt;
+    if (enemy.abilityTimer > 0) return;
+
+    enemy.abilityCastCount++;
+    if (enemy.abilityCastCount.isOdd) {
+      showAnnouncement('¡GOLPE SÍSMICO! Sal de las grietas', 2);
+      hazards.add(
+        HazardEntity(
+          position: player.position,
+          radius: enemy.phase == 2 ? 135 : 105,
+          damage: enemy.attackDamage * 1.55,
+          color: const Color(0xFFFF9F1C),
+          delay: 1.25,
+          duration: .65,
+          type: 'titanSlam',
+        ),
+      );
+    } else {
+      showAnnouncement('¡AVALANCHA! Esquiva las rocas rodantes', 2);
+      _launchRollingRocks(enemy);
+    }
+    AudioEngine.playBossAbility();
+    _openBossWeakPoint(enemy);
+    _setBossCooldown(enemy);
+  }
+
+  void _launchRollingRocks(EnemyEntity enemy) {
+    var direction = player.position - enemy.position;
+    direction = direction.distance > 0
+        ? direction / direction.distance
+        : const Offset(1, 0);
+    final baseAngle = atan2(direction.dy, direction.dx);
+    final count = enemy.phase == 2 ? 5 : 3;
+    final spread = enemy.phase == 2 ? .9 : .55;
+    for (var index = 0; index < count; index++) {
+      final ratio = count == 1 ? 0.0 : index / (count - 1);
+      final angle = baseAngle - spread / 2 + spread * ratio;
+      final velocity =
+          Offset(cos(angle), sin(angle)) * (enemy.phase == 2 ? 275.0 : 235.0);
+      rollingRocks.add(
+        RollingRockEntity(
+          position: enemy.position + Offset(cos(angle), sin(angle)) * 48,
+          velocity: velocity,
+          damage: enemy.attackDamage * .9,
+          radius: enemy.phase == 2 ? 23 : 20,
+        ),
+      );
+    }
+    AudioEngine.playRockLaunch();
+  }
+
+  void _tryElementalBossAbility(
+    EnemyEntity enemy,
+    double dt, {
+    required bool frost,
+  }) {
+    _updateBossPhase(enemy);
+    enemy.abilityTimer -= dt;
+    if (enemy.abilityTimer > 0) return;
+
+    final positions = <Offset>[player.position];
+    if (enemy.phase == 2) {
+      positions.addAll([
+        player.position + const Offset(100, 0),
+        player.position + const Offset(-100, 0),
+      ]);
+    }
+    for (final position in positions) {
+      hazards.add(
+        HazardEntity(
+          position: position,
+          radius: frost ? 110 : 100,
+          damage: enemy.attackDamage * 1.35,
+          color: frost ? Colors.lightBlueAccent : Colors.deepOrangeAccent,
+          delay: frost ? 1.45 : 1.05,
+          duration: .7,
+          type: frost ? 'iceStorm' : 'lavaBurst',
+        ),
+      );
+    }
+    showAnnouncement(frost ? '¡TORMENTA DE HIELO!' : '¡ERUPCIÓN INFERNAL!', 2);
+    AudioEngine.playBossAbility();
+    _openBossWeakPoint(enemy);
+    _setBossCooldown(enemy);
   }
 
   void _tryAreaStrike(EnemyEntity enemy, double dt) {
@@ -1517,6 +1725,8 @@ class GameEngine extends ChangeNotifier {
         damage: enemy.attackDamage * 1.5,
         color: Colors.deepOrange,
         delay: 1.2,
+        duration: .6,
+        type: 'titanSlam',
       ),
     );
   }
@@ -1560,6 +1770,17 @@ class GameEngine extends ChangeNotifier {
           speedScale: enemy.speedScale,
         ),
       );
+      hazards.add(
+        HazardEntity(
+          position: position,
+          radius: 42,
+          damage: 0,
+          color: const Color(0xFF70E000),
+          delay: 0,
+          duration: 1.2,
+          type: 'graveRise',
+        ),
+      );
       _spawnHitParticles(position, const Color(0xFF70E000));
       summoned++;
     }
@@ -1577,6 +1798,8 @@ class GameEngine extends ChangeNotifier {
         '¡RESURRECCIÓN! Destruye la formación que protege a Malachar',
         3,
       );
+      enemiesRevived += summoned;
+      AudioEngine.playResurrection();
     }
     final baseCooldown = enemy.config.abilityCooldownSeconds;
     enemy.abilityTimer = enemy.phase == 2
@@ -1608,6 +1831,18 @@ class GameEngine extends ChangeNotifier {
         speedScale: corpse.speedScale,
       )..health *= 0.45;
       enemies.add(revived);
+      enemiesRevived++;
+      hazards.add(
+        HazardEntity(
+          position: corpse.position,
+          radius: 44,
+          damage: 0,
+          color: const Color(0xFF70E000),
+          delay: 0,
+          duration: 1.1,
+          type: 'necromancy',
+        ),
+      );
       floatingTexts.add(
         FloatingTextEntity(
           position: corpse.position - const Offset(0, 35),
@@ -1617,6 +1852,7 @@ class GameEngine extends ChangeNotifier {
         ),
       );
       _spawnHitParticles(corpse.position, const Color(0xFF70E000));
+      AudioEngine.playResurrection();
       enemy.abilityTimer = enemy.config.abilityCooldownSeconds;
       return;
     }
@@ -1642,6 +1878,18 @@ class GameEngine extends ChangeNotifier {
       ),
     );
     _spawnHitParticles(ally.position, const Color(0xFF70E000));
+    hazards.add(
+      HazardEntity(
+        position: ally.position,
+        radius: 35,
+        damage: 0,
+        color: const Color(0xFF70E000),
+        delay: 0,
+        duration: .75,
+        type: 'soulLink',
+      ),
+    );
+    AudioEngine.playMagicImpact();
     enemy.abilityTimer = enemy.config.abilityCooldownSeconds;
   }
 
@@ -1945,14 +2193,25 @@ class GameEngine extends ChangeNotifier {
 
   void _damageEnemy(EnemyEntity enemy, double amount, {bool isCrit = false}) {
     if (enemy.isDead || enemy.rewardGranted || amount <= 0) return;
-    enemy.takeDamage(amount);
+    final effectiveAmount = amount * (enemy.vulnerableTimer > 0 ? 1.5 : 1);
+    final previousHealth = enemy.health;
+    enemy.takeDamage(effectiveAmount);
+    final dealt = max(0, previousHealth - enemy.health);
+    damageDealt += dealt;
+    final weakPointHit = enemy.vulnerableTimer > 0;
 
     floatingTexts.add(
       FloatingTextEntity(
         position: enemy.position - const Offset(0, 25),
-        text: isCrit ? '¡CRÍTICO! -${amount.toInt()}' : '-${amount.toInt()}',
-        color: isCrit ? const Color(0xFFFFD166) : Colors.white,
-        fontSize: isCrit ? 16 : 13,
+        text: weakPointHit
+            ? '¡DÉBIL! -${dealt.toInt()}'
+            : isCrit
+            ? '¡CRÍTICO! -${dealt.toInt()}'
+            : '-${dealt.toInt()}',
+        color: (isCrit || weakPointHit)
+            ? const Color(0xFFFFD166)
+            : Colors.white,
+        fontSize: (isCrit || weakPointHit) ? 16 : 13,
       ),
     );
 
@@ -1963,6 +2222,7 @@ class GameEngine extends ChangeNotifier {
 
     if (enemy.isDead) {
       enemy.rewardGranted = true;
+      if (enemy.config.isBoss) bossesDefeated++;
       corpses.add(
         CorpseEntity(
           position: enemy.position,

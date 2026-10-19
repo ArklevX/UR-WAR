@@ -14,7 +14,15 @@ enum EnemyCategory {
 /// High-level strategy used by the enemy AI controller.
 enum EnemyBehavior { raider, siege, rangedKiter, support, miniboss }
 
-enum EnemyAbility { none, areaStrike, healOrRevive, diamondResurrection }
+enum EnemyAbility {
+  none,
+  areaStrike,
+  healOrRevive,
+  diamondResurrection,
+  titanArsenal,
+  frostStorm,
+  lavaBurst,
+}
 
 /// Ordered preferences that future targeting rules can score independently.
 enum TargetPriority {
@@ -252,7 +260,7 @@ class EnemyConfig {
     behavior: EnemyBehavior.miniboss,
     preferredRange: 60,
     abilityCooldownSeconds: 6,
-    ability: EnemyAbility.areaStrike,
+    ability: EnemyAbility.titanArsenal,
     targetPriorities: const [
       TargetPriority.defenses,
       TargetPriority.player,
@@ -289,7 +297,11 @@ class EnemyConfig {
     behavior: EnemyBehavior.miniboss,
     preferredRange: 70,
     abilityCooldownSeconds: 6,
-    ability: EnemyAbility.areaStrike,
+    ability: biome == 'snow'
+        ? EnemyAbility.frostStorm
+        : biome == 'lava'
+        ? EnemyAbility.lavaBurst
+        : EnemyAbility.titanArsenal,
     targetPriorities: const [
       TargetPriority.defenses,
       TargetPriority.player,
