@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import '../../core/audio_engine.dart';
 import '../../core/save_system.dart';
+import '../graphics/battlefield_painter.dart';
 import '../graphics/pixel_art_data.dart';
 import '../models/enemy_type.dart';
 import '../models/entity.dart';
@@ -1713,5 +1714,11 @@ class GameEngine extends ChangeNotifier {
   void togglePause() {
     isPaused = !isPaused;
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    BattlefieldPainter.clearCache();
+    super.dispose();
   }
 }

@@ -1,7 +1,9 @@
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ur_war/core/save_system.dart';
+import 'package:ur_war/game/graphics/battlefield_painter.dart';
 import 'package:ur_war/game/logic/game_engine.dart';
 import 'package:ur_war/game/models/enemy_type.dart';
 import 'package:ur_war/game/models/entity.dart';
@@ -111,5 +113,14 @@ void main() {
     expect(SaveSystem.starsFor('test'), 3);
     expect(SaveSystem.data.levelScores['test'], 500);
     expect(SaveSystem.isLevelUnlocked(2), isTrue);
+  });
+
+  test('BattlefieldPainter paints terrain and clearCache disposes resources cleanly', () {
+    final painter = BattlefieldPainter(engine: engine);
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    painter.paint(canvas, const Size(800, 600));
+    recorder.endRecording().dispose();
+    expect(() => BattlefieldPainter.clearCache(), returnsNormally);
   });
 }

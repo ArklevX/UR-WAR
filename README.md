@@ -58,7 +58,7 @@
 1. Clonar el repositorio:
    ```bash
    git clone https://github.com/Minicodeveloper/UR-WAR.git
-   cd "UR WAR"
+   cd UR-WAR
    ```
 
 2. Obtener dependencias:

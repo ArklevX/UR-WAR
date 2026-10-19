@@ -10,7 +10,7 @@
 2. **Clona tu fork** localmente:
    ```bash
    git clone https://github.com/Minicodeveloper/UR-WAR.git
-   cd "UR WAR"
+   cd UR-WAR
    ```
 3. **Instala las dependencias**:
    ```bash
