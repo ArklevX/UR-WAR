@@ -14,9 +14,11 @@ class SaveData {
       autoAttack,
       aimAssist,
       leftHanded,
-      tutorialSeen;
+      tutorialSeen,
+      tutorialHintsEnabled;
   double soundVolume, musicVolume, controlScale;
   final Map<String, int> levelStars, levelScores, keyBindings;
+  final Set<String> tutorialHintsSeen;
 
   SaveData({
     this.highScore = 0,
@@ -32,12 +34,15 @@ class SaveData {
     this.controlScale = 1,
     this.leftHanded = false,
     this.tutorialSeen = false,
+    this.tutorialHintsEnabled = true,
     Map<String, int>? levelStars,
     Map<String, int>? levelScores,
     Map<String, int>? keyBindings,
+    Set<String>? tutorialHintsSeen,
   }) : levelStars = levelStars ?? {},
        levelScores = levelScores ?? {},
-       keyBindings = {...defaultKeyBindings, ...?keyBindings};
+       keyBindings = {...defaultKeyBindings, ...?keyBindings},
+       tutorialHintsSeen = tutorialHintsSeen ?? {};
 
   static Map<String, int> get defaultKeyBindings => {
     'moveUp': LogicalKeyboardKey.keyW.keyId,
@@ -67,6 +72,8 @@ class SaveData {
     'controlScale': controlScale,
     'leftHanded': leftHanded,
     'tutorialSeen': tutorialSeen,
+    'tutorialHintsEnabled': tutorialHintsEnabled,
+    'tutorialHintsSeen': tutorialHintsSeen.toList(),
     'levelStars': levelStars,
     'levelScores': levelScores,
     'keyBindings': keyBindings,
@@ -92,6 +99,12 @@ class SaveData {
       };
     }
 
+    Set<String> stringSet(String k) {
+      final value = json[k];
+      if (value is! List) return {};
+      return value.whereType<String>().toSet();
+    }
+
     return SaveData(
       highScore: integer('highScore'),
       totalKills: integer('totalKills'),
@@ -106,6 +119,8 @@ class SaveData {
       controlScale: decimal('controlScale', 1, .8, 1.3),
       leftHanded: boolean('leftHanded', false),
       tutorialSeen: boolean('tutorialSeen', false),
+      tutorialHintsEnabled: boolean('tutorialHintsEnabled', true),
+      tutorialHintsSeen: stringSet('tutorialHintsSeen'),
       levelStars: intMap('levelStars', 3),
       levelScores: intMap('levelScores', 2147483647),
       keyBindings: intMap('keyBindings', 0x1fffffffffffff),
@@ -236,6 +251,26 @@ class SaveSystem {
 
   static void setTutorialSeen(bool value) {
     _data.tutorialSeen = value;
+    save();
+  }
+
+  static bool hasSeenTutorialHint(String id) =>
+      _data.tutorialHintsSeen.contains(id);
+
+  static void markTutorialHintSeen(String id) {
+    if (_data.tutorialHintsSeen.add(id)) save();
+  }
+
+  static bool get tutorialHintsEnabled => _data.tutorialHintsEnabled;
+
+  static void setTutorialHintsEnabled(bool value) {
+    _data.tutorialHintsEnabled = value;
+    save();
+  }
+
+  static void resetTutorialHints() {
+    _data.tutorialHintsEnabled = true;
+    _data.tutorialHintsSeen.clear();
     save();
   }
 

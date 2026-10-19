@@ -246,16 +246,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.school_outlined),
-                  title: const Text('Volver a mostrar la guía inicial'),
+                  title: const Text('Volver a mostrar las guías'),
                   subtitle: const Text(
-                    'Se mostrará al comenzar tu siguiente defensa',
+                    'Reinicia la guía inicial y los consejos del nivel 1',
                   ),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () {
                     SaveSystem.setTutorialSeen(false);
+                    SaveSystem.resetTutorialHints();
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                        content: Text('Guía activada para la próxima partida.'),
+                        content: Text(
+                          'Guías activadas para la próxima partida.',
+                        ),
                       ),
                     );
                   },

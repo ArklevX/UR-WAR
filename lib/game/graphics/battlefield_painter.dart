@@ -542,6 +542,29 @@ class BattlefieldPainter extends CustomPainter {
   void _enemy(Canvas canvas, EnemyEntity enemy) {
     final config = enemy.config;
     final size = config.isBoss ? 3.8 : 2.6;
+    final emerging = enemy.emergenceTimer > 0;
+    final emergenceProgress = emerging
+        ? (1 - enemy.emergenceTimer / 1.2).clamp(0.0, 1.0)
+        : 1.0;
+    final renderPosition =
+        enemy.position + Offset(0, (1 - emergenceProgress) * 28);
+    if (emerging) {
+      canvas.drawOval(
+        Rect.fromCenter(
+          center: enemy.position + const Offset(0, 14),
+          width: 58,
+          height: 20,
+        ),
+        Paint()..color = const Color(0xFF182018).withValues(alpha: .8),
+      );
+      canvas.saveLayer(
+        Rect.fromCenter(center: enemy.position, width: 150, height: 170),
+        Paint()
+          ..color = Colors.white.withValues(
+            alpha: .35 + emergenceProgress * .65,
+          ),
+      );
+    }
     final sprite = SpriteAnimation.frame(
       config.sprite,
       phase: enemy.walkPhase,
@@ -551,7 +574,7 @@ class BattlefieldPainter extends CustomPainter {
     _sprite(
       canvas,
       sprite,
-      enemy.position,
+      renderPosition,
       size,
       flip: enemy.facingLeft,
       tint: enemy.hitFlashTimer > 0
@@ -561,6 +584,7 @@ class BattlefieldPainter extends CustomPainter {
           : null,
       intensity: .65,
     );
+    if (emerging) canvas.restore();
     if (enemy.phase > 1) {
       canvas.drawCircle(
         enemy.position,
@@ -571,13 +595,13 @@ class BattlefieldPainter extends CustomPainter {
           ..strokeWidth = 2,
       );
     }
-    if (enemy.health < config.maxHealth || config.isBoss) {
+    if (enemy.health < enemy.maxHealth || config.isBoss) {
       _health(
         canvas,
         enemy.position - Offset(0, config.isBoss ? 65 : 39),
         config.isBoss ? 94 : 30,
         enemy.health,
-        config.maxHealth,
+        enemy.maxHealth,
         config.healthBarColor,
       );
     }
@@ -1039,7 +1063,8 @@ class BattlefieldPainter extends CustomPainter {
     }
   }
 
-  static final _shadowPaint = Paint()..color = Colors.black.withValues(alpha: .25);
+  static final _shadowPaint = Paint()
+    ..color = Colors.black.withValues(alpha: .25);
   static final _healthBgPaint = Paint()..color = const Color(0xFF101B25);
   final _healthFillPaint = Paint();
 

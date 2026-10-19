@@ -163,6 +163,7 @@ class _VillageShopDialogState extends State<VillageShopDialog>
           _icon(type),
           BuildingSpec.forType(type).cost,
           () {
+            widget.engine.showTutorialForBuildingType(type);
             if (widget.engine.beginConstruction(
               type,
               BuildingSpec.forType(type).cost,
@@ -280,9 +281,15 @@ class _VillageShopDialogState extends State<VillageShopDialog>
         Align(
           alignment: Alignment.centerRight,
           child: FilledButton(
-            onPressed: enabled && widget.engine.player.gold >= cost
-                ? action
-                : null,
+            onPressed: !enabled
+                ? null
+                : () {
+                    if (widget.engine.player.gold < cost) {
+                      widget.engine.showTutorialForInsufficientGold();
+                      return;
+                    }
+                    action();
+                  },
             child: Text('$cost oro'),
           ),
         ),
@@ -303,13 +310,15 @@ class _VillageShopDialogState extends State<VillageShopDialog>
     _ => Icons.monetization_on,
   };
   static String _description(BuildingType type) => switch (type) {
-    BuildingType.watchtower => 'Ataques rápidos contra un objetivo.',
+    BuildingType.watchtower =>
+      'Ataques rápidos contra un objetivo. Ideal para cubrir caminos y accesos estrechos.',
     BuildingType.frostTower =>
-      'Ralentiza a los enemigos para que otras defensas los alcancen.',
+      'Ralentiza a los enemigos para que las demás defensas puedan atacarlos durante más tiempo.',
     BuildingType.cannonTower =>
-      'Disparos explosivos de área. Eficaz contra grupos.',
+      'Disparos explosivos de área. Eficaz contra grupos, pero dispara lentamente.',
     BuildingType.barricade =>
-      'Bloquea el paso. Los enemigos intentan rodearla o destruirla.',
-    _ => 'Produce oro periódicamente. Protégela de los saqueadores.',
+      'Bloquea el paso y desvía enemigos. Colócala delante de tus torres, sin cerrar todos los caminos.',
+    _ =>
+      'Produce oro periódicamente. Constrúyela lejos de los accesos y protégela de los saqueadores.',
   };
 }

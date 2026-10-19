@@ -26,4 +26,37 @@ void main() {
       expect(waves.nextWaveSummary.contains('Troll de las Cavernas'), isTrue);
     });
   });
+
+  group('Malachar miniboss', () {
+    test('appears in wave 4 of level 1 before the final boss', () {
+      final waves = WaveSystem(
+        maxWaves: 5,
+        biome: MapBiomeType.forest,
+        level: 1,
+      );
+
+      waves.startWave(4, 1000, 1000);
+
+      expect(
+        waves.nextWaveSummary,
+        contains(EnemyConfig.necromancerMiniboss.name),
+      );
+    });
+
+    test('does not replace the final biome boss', () {
+      final waves = WaveSystem(
+        maxWaves: 5,
+        biome: MapBiomeType.forest,
+        level: 1,
+      );
+
+      waves.startWave(5, 1000, 1000);
+
+      expect(waves.nextWaveSummary, contains('TITÁN DEL VALLE'));
+      expect(
+        waves.nextWaveSummary,
+        isNot(contains(EnemyConfig.necromancerMiniboss.name)),
+      );
+    });
+  });
 }
