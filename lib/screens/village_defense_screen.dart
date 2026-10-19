@@ -56,9 +56,8 @@ class _VillageDefenseScreenState extends State<VillageDefenseScreen>
     _engine = GameEngine(map: widget.mapModel, playerClass: widget.playerClass);
     _ticker = createTicker(_onTick)..start();
     AudioEngine.startMusic('battle');
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && !SaveSystem.data.tutorialSeen) _showHelp();
-    });
+    // The first level uses contextual HUD hints. Full controls remain
+    // available through the help button.
   }
 
   @override
@@ -227,12 +226,13 @@ class _VillageDefenseScreenState extends State<VillageDefenseScreen>
     }
   }
 
-  Future<void> _showShop() => _modal(
-    () => showDialog<void>(
+  Future<void> _showShop() => _modal(() {
+    _engine.showTutorialForShop();
+    return showDialog<void>(
       context: context,
       builder: (_) => VillageShopDialog(engine: _engine),
-    ),
-  );
+    );
+  });
 
   Future<void> _showHelp() => _modal(() async {
     await showDialog<void>(
@@ -369,8 +369,9 @@ class _VillageDefenseScreenState extends State<VillageDefenseScreen>
     _engine.closeNpcDialogue();
   }
 
-  Future<void> _inspectBuilding(VillageBuildingEntity building) => _modal(
-    () => showDialog<void>(
+  Future<void> _inspectBuilding(VillageBuildingEntity building) => _modal(() {
+    _engine.showTutorialForBuildingType(building.type);
+    return showDialog<void>(
       context: context,
       builder: (context) => AnimatedBuilder(
         animation: _engine,
@@ -418,8 +419,8 @@ class _VillageDefenseScreenState extends State<VillageDefenseScreen>
           ],
         ),
       ),
-    ),
-  );
+    );
+  });
 
   void _fieldDown(PointerDownEvent event) {
     if (_finished || _modalOpen) return;

@@ -4,11 +4,13 @@ import '../../core/audio_engine.dart';
 import '../../core/save_system.dart';
 import '../graphics/battlefield_painter.dart';
 import '../graphics/pixel_art_data.dart';
+import 'enemy_ai.dart';
 import '../models/enemy_type.dart';
 import '../models/entity.dart';
 import '../models/game_map.dart';
 import '../models/npc_model.dart';
 import '../models/player_class.dart';
+import '../models/tutorial_hint.dart';
 import '../models/wave_system.dart';
 
 class GameEngine extends ChangeNotifier {
@@ -33,6 +35,7 @@ class GameEngine extends ChangeNotifier {
   double objectiveProgress = 0;
   int fortificationLevel = 0;
   double _eruptionTimer = 9;
+  double _preparationIdleTimer = 0;
   BuildingType? pendingBuildingType;
   Offset? buildPreviewPosition;
   int _pendingBuildCost = 0;
@@ -59,6 +62,8 @@ class GameEngine extends ChangeNotifier {
   bool isGameOver = false;
   bool isVictory = false;
   bool isPaused = false;
+  TutorialHint? activeTutorialHint;
+  final List<TutorialHint> _pendingTutorialHints = [];
   String? announcementBanner;
   double announcementTimer = 0.0;
 
@@ -218,7 +223,146 @@ class GameEngine extends ChangeNotifier {
       'PREPARACIÓN: construye, explora y comienza cuando estés listo',
       5,
     );
+    if (map.levelIndex == 1) {
+      _showTutorialHint(
+        const TutorialHint(
+          id: 'level1_welcome',
+          title: 'GUÍA DE BATALLA',
+          message:
+              'Defiende el Salón Comunal y sobrevive a todas las oleadas. Explora la aldea antes de comenzar.',
+          icon: Icons.shield,
+        ),
+      );
+    }
     _updateCamera();
+  }
+
+  void dismissTutorialHint() {
+    final dismissed = activeTutorialHint;
+    if (dismissed == null) return;
+    SaveSystem.markTutorialHintSeen(dismissed.id);
+    activeTutorialHint = _pendingTutorialHints.isEmpty
+        ? null
+        : _pendingTutorialHints.removeAt(0);
+    notifyListeners();
+  }
+
+  void disableTutorialHints() {
+    activeTutorialHint = null;
+    _pendingTutorialHints.clear();
+    SaveSystem.setTutorialHintsEnabled(false);
+    notifyListeners();
+  }
+
+  void _showTutorialHint(TutorialHint hint) {
+    if (map.levelIndex != 1 ||
+        !SaveSystem.tutorialHintsEnabled ||
+        SaveSystem.hasSeenTutorialHint(hint.id) ||
+        activeTutorialHint?.id == hint.id ||
+        _pendingTutorialHints.any((pending) => pending.id == hint.id)) {
+      return;
+    }
+    if (activeTutorialHint == null) {
+      activeTutorialHint = hint;
+    } else {
+      _pendingTutorialHints.add(hint);
+    }
+    notifyListeners();
+  }
+
+  void showTutorialForBuildingType(BuildingType type) {
+    final hint = switch (type) {
+      BuildingType.watchtower => const TutorialHint(
+        id: 'level1_item_watchtower',
+        title: 'TORRE DE VIGILANCIA',
+        message:
+            'Dispara rápidamente a un enemigo. Colócala cerca de los caminos para cubrir los accesos.',
+        icon: Icons.fort,
+      ),
+      BuildingType.frostTower => const TutorialHint(
+        id: 'level1_item_frost_tower',
+        title: 'TORRE DE ESCARCHA',
+        message:
+            'Ralentiza a los invasores. Combínala con otras torres para mantenerlos bajo ataque más tiempo.',
+        icon: Icons.ac_unit,
+      ),
+      BuildingType.cannonTower => const TutorialHint(
+        id: 'level1_item_cannon',
+        title: 'TORRE DE ASEDIO',
+        message:
+            'Causa daño explosivo en área. Es costosa, pero muy eficaz contra grupos numerosos.',
+        icon: Icons.flare,
+      ),
+      BuildingType.barricade => const TutorialHint(
+        id: 'level1_item_barricade',
+        title: 'BARRICADA',
+        message:
+            'Bloquea y desvía el avance enemigo. Úsala para proteger torres y ganar tiempo.',
+        icon: Icons.fence,
+      ),
+      BuildingType.goldMine => const TutorialHint(
+        id: 'level1_item_gold_mine',
+        title: 'MINA DE ORO',
+        message:
+            'Produce oro periódicamente. Constrúyela en una zona protegida para financiar nuevas defensas.',
+        icon: Icons.monetization_on,
+      ),
+      _ => const TutorialHint(
+        id: 'level1_building',
+        title: 'EDIFICIO DE LA ALDEA',
+        message:
+            'Toca un edificio para revisar su salud, repararlo o mejorarlo con oro.',
+        icon: Icons.home_work,
+      ),
+    };
+    _showTutorialHint(hint);
+  }
+
+  void showTutorialForShop() {
+    _showTutorialHint(
+      const TutorialHint(
+        id: 'level1_shop',
+        title: 'ARMERÍA DE LA ALDEA',
+        message:
+            'Usa el oro para reparar edificios, mejorar tu héroe o construir torres antes de iniciar una oleada.',
+        icon: Icons.storefront,
+      ),
+    );
+  }
+
+  void showTutorialForInsufficientGold() {
+    _showTutorialHint(
+      const TutorialHint(
+        id: 'level1_insufficient_gold',
+        title: 'ORO INSUFICIENTE',
+        message:
+            'Derrota enemigos, supera oleadas o protege una mina para conseguir el oro que te falta.',
+        icon: Icons.savings,
+      ),
+    );
+  }
+
+  void _damageVillageBuilding(VillageBuildingEntity building, double damage) {
+    final previousHealth = building.health;
+    building.takeDamage(damage);
+    if (building.health >= previousHealth) return;
+    _showTutorialHint(
+      building == townHall
+          ? const TutorialHint(
+              id: 'level1_town_hall_under_attack',
+              title: '¡EL SALÓN ESTÁ BAJO ATAQUE!',
+              message:
+                  'Si el Salón Comunal es destruido perderás la batalla. Regresa y elimina a sus atacantes.',
+              icon: Icons.crisis_alert,
+            )
+          : const TutorialHint(
+              id: 'level1_defense_damaged',
+              title: 'DEFENSA DAÑADA',
+              message:
+                  'Una estructura defensiva está recibiendo daño. Puedes repararla tocándola o desde la tienda.',
+              icon: Icons.build,
+            ),
+    );
   }
 
   void interactWithNearbyNpc() {
@@ -308,6 +452,7 @@ class GameEngine extends ChangeNotifier {
 
   void _step(double dt) {
     elapsedTime += dt;
+    final specialWasCoolingDown = player.specialSkillTimer > 0;
     player.attackTimer = max(0, player.attackTimer - dt);
     player.specialSkillTimer = max(0, player.specialSkillTimer - dt);
     player.ultimateSkillTimer = max(0, player.ultimateSkillTimer - dt);
@@ -326,6 +471,33 @@ class GameEngine extends ChangeNotifier {
     freezeTimer = max(0, freezeTimer - dt);
     villageShieldTimer = max(0, villageShieldTimer - dt);
     if (player.isMoving) player.walkPhase += dt * 10;
+    if (!waveSystem.isWaveInProgress && completedWaves == 0) {
+      _preparationIdleTimer = player.isMoving ? 0 : _preparationIdleTimer + dt;
+      if (_preparationIdleTimer >= 15) {
+        _showTutorialHint(
+          const TutorialHint(
+            id: 'level1_preparation_idle',
+            title: 'PREPARA LA DEFENSA',
+            message:
+                'Explora, construye una torre o pulsa “Iniciar oleada” cuando estés preparado para combatir.',
+            icon: Icons.hourglass_bottom,
+          ),
+        );
+      }
+    } else {
+      _preparationIdleTimer = 0;
+    }
+    if (specialWasCoolingDown && player.specialSkillTimer <= 0) {
+      _showTutorialHint(
+        const TutorialHint(
+          id: 'level1_special_ready',
+          title: 'HABILIDAD LISTA',
+          message:
+              'Tu habilidad especial volvió a estar disponible. Úsala cuando varios enemigos estén cerca.',
+          icon: Icons.auto_awesome,
+        ),
+      );
+    }
     _revealFogArea(player.position, 240);
     _applyPassiveSkills(dt);
     if (announcementTimer > 0) {
@@ -348,8 +520,9 @@ class GameEngine extends ChangeNotifier {
     _updateVFX(dt);
     for (final corpse in corpses) {
       corpse.lifeTime -= dt;
+      corpse.reviveWindow -= dt;
     }
-    corpses.removeWhere((c) => c.lifeTime <= 0);
+    corpses.removeWhere((c) => c.reviveWindow <= 0);
     enemies.removeWhere((e) => e.isDead);
     if (player.health <= 0 || townHall.health <= 0) {
       isGameOver = true;
@@ -414,6 +587,18 @@ class GameEngine extends ChangeNotifier {
       return;
     }
     waveSystem.startWave(completedWaves + 1, map.worldWidth, map.worldHeight);
+    _preparationIdleTimer = 0;
+    if (waveSystem.currentWave == 1) {
+      _showTutorialHint(
+        const TutorialHint(
+          id: 'level1_first_wave',
+          title: 'PRIMERA OLEADA',
+          message:
+              'Los goblins son rápidos pero débiles. Mantén la distancia y deja que tus torres ayuden a derrotarlos.',
+          icon: Icons.warning_amber,
+        ),
+      );
+    }
     showAnnouncement('¡OLEADA ${waveSystem.currentWave}! Defiende la aldea', 2);
     notifyListeners();
   }
@@ -746,7 +931,18 @@ class GameEngine extends ChangeNotifier {
   /// Habilidad especial
   void useSpecialSkill() {
     if (isGameOver || isVictory || isPaused) return;
-    if (player.specialSkillTimer > 0) return;
+    if (player.specialSkillTimer > 0) {
+      _showTutorialHint(
+        const TutorialHint(
+          id: 'level1_special_cooldown',
+          title: 'HABILIDAD EN RECARGA',
+          message:
+              'Espera a que el contador llegue a cero. Mientras tanto, sigue moviéndote y usa tu ataque básico.',
+          icon: Icons.timer_outlined,
+        ),
+      );
+      return;
+    }
 
     player.specialSkillTimer = playerClass.specialSkillCooldownSeconds;
     AudioEngine.playSpecialSkill();
@@ -941,11 +1137,14 @@ class GameEngine extends ChangeNotifier {
 
   bool beginConstruction(BuildingType type, int cost) {
     final price = BuildingSpec.forType(type).cost;
+    if (player.gold < price) {
+      showTutorialForInsufficientGold();
+      return false;
+    }
     if (isGameOver ||
         isVictory ||
         type == BuildingType.townHall ||
         cost != price ||
-        player.gold < price ||
         villageBuildings.where((b) => !b.isDead).length >= 30) {
       return false;
     }
@@ -977,6 +1176,7 @@ class GameEngine extends ChangeNotifier {
         position == null ||
         !canPlaceStructure(type, position) ||
         player.gold < _pendingBuildCost) {
+      if (player.gold < _pendingBuildCost) showTutorialForInsufficientGold();
       return false;
     }
     final spec = BuildingSpec.forType(type);
@@ -1027,6 +1227,10 @@ class GameEngine extends ChangeNotifier {
 
   bool upgradeBuilding(String id) {
     final building = villageBuildings.where((b) => b.id == id).firstOrNull;
+    if (building != null && player.gold < building.upgradeCost) {
+      showTutorialForInsufficientGold();
+      return false;
+    }
     if (building == null ||
         building.isDead ||
         building.level >= 3 ||
@@ -1044,6 +1248,10 @@ class GameEngine extends ChangeNotifier {
 
   bool repairBuilding(String id) {
     final building = villageBuildings.where((b) => b.id == id).firstOrNull;
+    if (building != null && player.gold < building.repairCost) {
+      showTutorialForInsufficientGold();
+      return false;
+    }
     if (building == null ||
         building.isDead ||
         building.health >= building.maxHealth ||
@@ -1058,7 +1266,11 @@ class GameEngine extends ChangeNotifier {
   }
 
   bool fortifyVillage() {
-    if (player.gold < 100 || fortificationLevel >= 3) return false;
+    if (player.gold < 100) {
+      showTutorialForInsufficientGold();
+      return false;
+    }
+    if (fortificationLevel >= 3) return false;
     player.gold -= 100;
     fortificationLevel++;
     for (final b in villageBuildings.where((b) => !b.isDead)) {
@@ -1089,17 +1301,48 @@ class GameEngine extends ChangeNotifier {
     bool isWaveEnemy = false,
   }) {
     _enemyIdCounter++;
+    final wave = waveSystem.currentWave;
     enemies.add(
       EnemyEntity(
         id: 'enemy_$_enemyIdCounter',
         isWaveEnemy: isWaveEnemy,
         config: config,
         position: position,
+        healthScale: EnemyDifficulty.healthScaleForWave(wave),
+        damageScale: EnemyDifficulty.damageScaleForWave(wave),
+        speedScale: EnemyDifficulty.speedScaleForWave(wave),
       ),
     );
 
     if (config.isBoss) {
-      showAnnouncement('¡JEFE: ${config.name}! Evita sus zonas de ataque', 4.0);
+      showAnnouncement(
+        config.ability == EnemyAbility.diamondResurrection
+            ? '¡MINIJEFE: ${config.name}! Impide que complete su formación'
+            : '¡JEFE: ${config.name}! Evita sus zonas de ataque',
+        4.0,
+      );
+    }
+    if (config.category == EnemyCategory.goblin) {
+      _showTutorialHint(
+        const TutorialHint(
+          id: 'level1_goblin',
+          title: 'GOBLIN SAQUEADOR',
+          message:
+              'Es rápido y ataca en grupo. Elimínalo antes de que llegue a tus edificios.',
+          icon: Icons.directions_run,
+        ),
+      );
+    }
+    if (config.category == EnemyCategory.orc) {
+      _showTutorialHint(
+        const TutorialHint(
+          id: 'level1_orc',
+          title: 'ORCO BERSERKER',
+          message:
+              'Tiene mucha vida y golpea fuerte. Debilítalo con torres antes de enfrentarlo.',
+          icon: Icons.security,
+        ),
+      );
     }
   }
 
@@ -1111,6 +1354,17 @@ class GameEngine extends ChangeNotifier {
               direction.distance
         : 1.0;
     player.takeDamage(damage * (player.isBlocking && facing > 0.3 ? 0.25 : 1));
+    if (player.health > 0 && player.health <= player.maxHealth * .35) {
+      _showTutorialHint(
+        const TutorialHint(
+          id: 'level1_low_health',
+          title: 'SALUD BAJA',
+          message:
+              'Retrocede, esquiva los ataques y compra una Poción de vitalidad en la tienda.',
+          icon: Icons.favorite_border,
+        ),
+      );
+    }
   }
 
   void _updateHazards(double dt) {
@@ -1169,7 +1423,7 @@ class GameEngine extends ChangeNotifier {
           for (final b in villageBuildings) {
             if (!b.isDead &&
                 (b.position - h.position).distance <= h.radius + b.radius) {
-              b.takeDamage(h.damage);
+              _damageVillageBuilding(b, h.damage);
             }
           }
         }
@@ -1181,120 +1435,372 @@ class GameEngine extends ChangeNotifier {
   void _updateEnemies(double dt) {
     for (final enemy in List<EnemyEntity>.from(enemies)) {
       if (enemy.isDead) continue;
+      _updateEnemyTimers(enemy, dt);
+      if (enemy.emergenceTimer > 0) continue;
+      if (_maintainGuardFormation(enemy, dt)) continue;
+      _tryEnemyAbility(enemy, dt);
+      final target =
+          _selectGuardThreat(enemy) ??
+          _selectCoordinatedTarget(enemy) ??
+          _selectEnemyTarget(enemy);
+      final difference = target.position - enemy.position;
+      final distance = difference.distance;
+      _updateEnemyFacing(enemy, difference);
 
-      if (enemy.attackTimer > 0) enemy.attackTimer -= dt;
-      if (enemy.hitFlashTimer > 0) enemy.hitFlashTimer -= dt;
-      enemy.walkPhase += dt * 8;
-      enemy.slowTimer = max(0, enemy.slowTimer - dt);
-      if (enemy.config.isBoss) {
-        enemy.phase = enemy.health < enemy.config.maxHealth * 0.5 ? 2 : 1;
-        enemy.abilityTimer -= dt;
-        if (enemy.abilityTimer <= 0) {
-          enemy.abilityTimer = enemy.phase == 2 ? 3.5 : 6;
-          hazards.add(
-            HazardEntity(
-              position: player.position,
-              radius: enemy.phase == 2 ? 100 : 75,
-              damage: enemy.config.attackDamage * 1.5,
-              color: Colors.deepOrange,
-              delay: 1.2,
-            ),
-          );
-        }
+      final movementIntent = EnemyMovementPolicy.intentFor(
+        enemy: enemy,
+        target: target,
+      );
+      if (movementIntent == EnemyMovementIntent.retreat) {
+        _updateEnemyMovement(enemy, target, dt, retreat: true);
+        continue;
       }
 
-      final distToPlayer = (player.position - enemy.position).distance;
-      final distToTown = (townHall.position - enemy.position).distance;
-
-      Offset targetPos;
-      bool targetIsPlayer = false;
-      VillageBuildingEntity? selectedBuilding;
-
-      if (distToPlayer < 180) {
-        targetPos = player.position;
-        targetIsPlayer = true;
+      if (_isEnemyTargetInRange(enemy, target, distance)) {
+        _tryEnemyAttack(enemy, target, difference, distance);
       } else {
-        VillageBuildingEntity nearestB = townHall;
-        double nearestBDist = distToTown;
-        for (final b in villageBuildings) {
-          if (b.isDead) continue;
-          final d = (b.position - enemy.position).distance;
-          if (d < nearestBDist) {
-            nearestBDist = d;
-            nearestB = b;
-          }
-        }
-        targetPos = nearestB.position;
-        selectedBuilding = nearestB;
-      }
-
-      final diff = targetPos - enemy.position;
-      final distance = diff.distance;
-
-      if (diff.dx < -5) enemy.facingLeft = true;
-      if (diff.dx > 5) enemy.facingLeft = false;
-
-      if (distance <=
-          enemy.config.attackRange + (selectedBuilding?.radius ?? 20)) {
-        if (enemy.attackTimer <= 0) {
-          enemy.attackTimer = enemy.config.attackCooldownSeconds;
-          if (enemy.config.isRanged) {
-            final shootDir = distance > 0
-                ? diff / distance
-                : const Offset(1, 0);
-            projectiles.add(
-              ProjectileEntity(
-                position: enemy.position,
-                velocity: shootDir * 280,
-                damage: enemy.config.attackDamage,
-                radius: 4.0,
-                color: enemy.config.category == EnemyCategory.necromancer
-                    ? const Color(0xFF70E000)
-                    : const Color(0xFFE8E8E8),
-                isFromPlayer: false,
-              ),
-            );
-          } else {
-            if (targetIsPlayer) {
-              _hurtPlayer(enemy.config.attackDamage, enemy.position);
-              floatingTexts.add(
-                FloatingTextEntity(
-                  position: player.position - const Offset(0, 20),
-                  text: '-${enemy.config.attackDamage.toInt()}',
-                  color: Colors.redAccent,
-                ),
-              );
-            } else {
-              // Si el Escudo Divino de la aldea está activo, no recibe daño
-              if (villageShieldTimer <= 0) {
-                final targetBuilding = selectedBuilding ?? townHall;
-                targetBuilding.takeDamage(enemy.config.attackDamage);
-                floatingTexts.add(
-                  FloatingTextEntity(
-                    position: targetBuilding.position - const Offset(0, 30),
-                    text: '-${enemy.config.attackDamage.toInt()}',
-                    color: Colors.redAccent,
-                  ),
-                );
-              }
-            }
-          }
-        }
-      } else {
-        final moveDir = diff / distance;
-        enemy.position = _moveWithCollision(
-          enemy.position,
-          moveDir *
-              enemy.config.speed *
-              (enemy.slowTimer > 0 ? enemy.slowFactor : 1) *
-              dt,
-          enemy.config.hitRadius,
-          steer: true,
-        );
+        _updateEnemyMovement(enemy, target, dt);
       }
     }
 
     enemies.removeWhere((e) => e.isDead);
+  }
+
+  void _updateEnemyTimers(EnemyEntity enemy, double dt) {
+    if (enemy.attackTimer > 0) enemy.attackTimer -= dt;
+    if (enemy.hitFlashTimer > 0) enemy.hitFlashTimer -= dt;
+    enemy.walkPhase += dt * 8;
+    enemy.slowTimer = max(0, enemy.slowTimer - dt);
+    enemy.emergenceTimer = max(0, enemy.emergenceTimer - dt);
+  }
+
+  void _tryEnemyAbility(EnemyEntity enemy, double dt) {
+    switch (enemy.config.ability) {
+      case EnemyAbility.none:
+        return;
+      case EnemyAbility.healOrRevive:
+        _trySupportAbility(enemy, dt);
+        return;
+      case EnemyAbility.diamondResurrection:
+        _tryDiamondResurrection(enemy, dt);
+        return;
+      case EnemyAbility.areaStrike:
+        _tryAreaStrike(enemy, dt);
+        return;
+    }
+  }
+
+  void _updateBossPhase(EnemyEntity enemy) {
+    final nextPhase = enemy.health < enemy.maxHealth * 0.5 ? 2 : 1;
+    if (nextPhase > enemy.phase) {
+      enemy.phase = nextPhase;
+      showAnnouncement('¡${enemy.config.name} ENTRA EN FASE $nextPhase!', 3);
+      _spawnExplosionParticles(enemy.position, enemy.config.healthBarColor, 28);
+    }
+  }
+
+  void _tryAreaStrike(EnemyEntity enemy, double dt) {
+    _updateBossPhase(enemy);
+    enemy.abilityTimer -= dt;
+    if (enemy.abilityTimer > 0) return;
+
+    final baseCooldown = enemy.config.abilityCooldownSeconds > 0
+        ? enemy.config.abilityCooldownSeconds
+        : 6.0;
+    enemy.abilityTimer = enemy.phase == 2
+        ? max(3.5, baseCooldown * .58)
+        : baseCooldown;
+    hazards.add(
+      HazardEntity(
+        position: player.position,
+        radius: enemy.phase == 2 ? 100 : 75,
+        damage: enemy.attackDamage * 1.5,
+        color: Colors.deepOrange,
+        delay: 1.2,
+      ),
+    );
+  }
+
+  void _tryDiamondResurrection(EnemyEntity enemy, double dt) {
+    _updateBossPhase(enemy);
+    enemy.abilityTimer -= dt;
+    if (enemy.abilityTimer > 0) return;
+
+    const formation = [
+      Offset(0, -95),
+      Offset(95, 0),
+      Offset(0, 95),
+      Offset(-95, 0),
+    ];
+    final occupiedOffsets = enemies
+        .where(
+          (candidate) =>
+              !candidate.isDead && candidate.guardLeaderId == enemy.id,
+        )
+        .map((candidate) => candidate.guardOffset)
+        .toSet();
+    var summoned = 0;
+    for (final offset in formation) {
+      if (occupiedOffsets.contains(offset)) continue;
+      _enemyIdCounter++;
+      final position = enemy.position + offset;
+      enemies.add(
+        EnemyEntity(
+          id: 'enemy_$_enemyIdCounter',
+          config: EnemyConfig.skeleton,
+          position: position,
+          isWaveEnemy: enemy.isWaveEnemy,
+          canBeRevived: false,
+          grantsReward: false,
+          guardLeaderId: enemy.id,
+          guardOffset: offset,
+          emergenceTimer: 1.2,
+          healthScale: enemy.maxHealth / enemy.config.maxHealth,
+          damageScale: enemy.damageScale,
+          speedScale: enemy.speedScale,
+        ),
+      );
+      _spawnHitParticles(position, const Color(0xFF70E000));
+      summoned++;
+    }
+
+    if (summoned > 0) {
+      floatingTexts.add(
+        FloatingTextEntity(
+          position: enemy.position - const Offset(0, 75),
+          text: '¡RESURRECCIÓN!',
+          color: const Color(0xFF70E000),
+          fontSize: 17,
+        ),
+      );
+      showAnnouncement(
+        '¡RESURRECCIÓN! Destruye la formación que protege a Malachar',
+        3,
+      );
+    }
+    final baseCooldown = enemy.config.abilityCooldownSeconds;
+    enemy.abilityTimer = enemy.phase == 2
+        ? max(6, baseCooldown * 0.7)
+        : baseCooldown;
+  }
+
+  void _trySupportAbility(EnemyEntity enemy, double dt) {
+    enemy.abilityTimer -= dt;
+    if (enemy.abilityTimer > 0) return;
+
+    final range = enemy.config.attackRange + 40;
+    final corpse = EnemySupportPolicy.nearestRevivableCorpse(
+      origin: enemy.position,
+      corpses: corpses,
+      range: range,
+    );
+    if (corpse != null) {
+      corpses.remove(corpse);
+      _enemyIdCounter++;
+      final revived = EnemyEntity(
+        id: 'enemy_$_enemyIdCounter',
+        config: corpse.config,
+        position: corpse.position,
+        isWaveEnemy: corpse.isWaveEnemy,
+        canBeRevived: false,
+        healthScale: corpse.healthScale,
+        damageScale: corpse.damageScale,
+        speedScale: corpse.speedScale,
+      )..health *= 0.45;
+      enemies.add(revived);
+      floatingTexts.add(
+        FloatingTextEntity(
+          position: corpse.position - const Offset(0, 35),
+          text: '¡REVIVIDO!',
+          color: const Color(0xFF70E000),
+          fontSize: 14,
+        ),
+      );
+      _spawnHitParticles(corpse.position, const Color(0xFF70E000));
+      enemy.abilityTimer = enemy.config.abilityCooldownSeconds;
+      return;
+    }
+
+    final ally = EnemySupportPolicy.mostWoundedAlly(
+      supporter: enemy,
+      enemies: enemies,
+      range: range,
+    );
+    if (ally == null) {
+      enemy.abilityTimer = 1;
+      return;
+    }
+
+    final healing = ally.maxHealth * 0.3;
+    ally.health = min(ally.maxHealth, ally.health + healing);
+    floatingTexts.add(
+      FloatingTextEntity(
+        position: ally.position - const Offset(0, 35),
+        text: '+${healing.toInt()}',
+        color: const Color(0xFF70E000),
+        fontSize: 14,
+      ),
+    );
+    _spawnHitParticles(ally.position, const Color(0xFF70E000));
+    enemy.abilityTimer = enemy.config.abilityCooldownSeconds;
+  }
+
+  EnemyTargetSelection _selectEnemyTarget(EnemyEntity enemy) {
+    return EnemyTargetingPolicy.select(
+      enemy: enemy,
+      playerPosition: player.position,
+      townHall: townHall,
+      buildings: villageBuildings,
+    );
+  }
+
+  EnemyTargetSelection? _selectCoordinatedTarget(EnemyEntity enemy) {
+    if (EnemyCoordinationPolicy.isPackAlerted(
+      enemy: enemy,
+      enemies: enemies,
+      playerPosition: player.position,
+    )) {
+      return EnemyTargetSelection.player(player.position);
+    }
+    return null;
+  }
+
+  EnemyEntity? _guardLeader(EnemyEntity enemy) {
+    final leaderId = enemy.guardLeaderId;
+    if (leaderId == null) return null;
+    for (final candidate in enemies) {
+      if (candidate.id == leaderId && !candidate.isDead) return candidate;
+    }
+    return null;
+  }
+
+  bool _maintainGuardFormation(EnemyEntity enemy, double dt) {
+    final leader = _guardLeader(enemy);
+    if (leader == null) return false;
+    if ((player.position - leader.position).distance <= 330) return false;
+
+    final destination = leader.position + enemy.guardOffset;
+    final difference = destination - enemy.position;
+    _updateEnemyFacing(enemy, difference);
+    if (difference.distance > 12) {
+      final direction = difference / difference.distance;
+      enemy.position = _moveWithCollision(
+        enemy.position,
+        direction * enemy.movementSpeed * dt,
+        enemy.config.hitRadius,
+        steer: true,
+      );
+    }
+    return true;
+  }
+
+  EnemyTargetSelection? _selectGuardThreat(EnemyEntity enemy) {
+    final leader = _guardLeader(enemy);
+    if (leader == null) return null;
+    if ((player.position - leader.position).distance <= 330) {
+      return EnemyTargetSelection.player(player.position);
+    }
+    return null;
+  }
+
+  void _updateEnemyFacing(EnemyEntity enemy, Offset difference) {
+    if (difference.dx < -5) enemy.facingLeft = true;
+    if (difference.dx > 5) enemy.facingLeft = false;
+  }
+
+  bool _isEnemyTargetInRange(
+    EnemyEntity enemy,
+    EnemyTargetSelection target,
+    double distance,
+  ) => distance <= enemy.config.attackRange + (target.building?.radius ?? 20);
+
+  void _tryEnemyAttack(
+    EnemyEntity enemy,
+    EnemyTargetSelection target,
+    Offset difference,
+    double distance,
+  ) {
+    if (enemy.attackTimer > 0) return;
+    enemy.attackTimer = enemy.config.attackCooldownSeconds;
+
+    if (enemy.config.isRanged) {
+      final shootDirection = distance > 0
+          ? difference / distance
+          : const Offset(1, 0);
+      projectiles.add(
+        ProjectileEntity(
+          position: enemy.position,
+          velocity: shootDirection * 280,
+          damage: enemy.attackDamage,
+          radius: 4.0,
+          color:
+              enemy.config.category == EnemyCategory.necromancer ||
+                  enemy.config.category == EnemyCategory.necromancerMiniboss
+              ? const Color(0xFF70E000)
+              : const Color(0xFFE8E8E8),
+          isFromPlayer: false,
+        ),
+      );
+      return;
+    }
+
+    if (target.targetsPlayer) {
+      _hurtPlayer(enemy.attackDamage, enemy.position);
+      floatingTexts.add(
+        FloatingTextEntity(
+          position: player.position - const Offset(0, 20),
+          text: '-${enemy.attackDamage.toInt()}',
+          color: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
+    if (villageShieldTimer > 0) return;
+    final targetBuilding = target.building ?? townHall;
+    _damageVillageBuilding(targetBuilding, enemy.attackDamage);
+    floatingTexts.add(
+      FloatingTextEntity(
+        position: targetBuilding.position - const Offset(0, 30),
+        text: '-${enemy.attackDamage.toInt()}',
+        color: Colors.redAccent,
+      ),
+    );
+  }
+
+  void _updateEnemyMovement(
+    EnemyEntity enemy,
+    EnemyTargetSelection target,
+    double dt, {
+    bool retreat = false,
+  }) {
+    var movementTarget = target.position;
+    if (target.targetsPlayer &&
+        enemy.config.behavior == EnemyBehavior.raider &&
+        !retreat) {
+      movementTarget += EnemyCoordinationPolicy.flankOffset(enemy.id);
+    }
+    final difference = movementTarget - enemy.position;
+    if (difference.distance <= 0) return;
+    var moveDirection =
+        difference / difference.distance * (retreat ? -1.0 : 1.0);
+    final separation = EnemyCoordinationPolicy.separation(
+      enemy: enemy,
+      enemies: enemies,
+    );
+    if (separation.distance > 0) {
+      final combined = moveDirection + separation * 0.65;
+      if (combined.distance > 0) moveDirection = combined / combined.distance;
+    }
+    enemy.position = _moveWithCollision(
+      enemy.position,
+      moveDirection *
+          enemy.movementSpeed *
+          (enemy.slowTimer > 0 ? enemy.slowFactor : 1) *
+          dt,
+      enemy.config.hitRadius,
+      steer: true,
+    );
   }
 
   void _updateVillageDefenses(double dt) {
@@ -1418,7 +1924,7 @@ class GameEngine extends ChangeNotifier {
           for (final b in villageBuildings) {
             if (b.isDead) continue;
             if ((b.position - p.position).distance <= b.radius) {
-              b.takeDamage(p.damage);
+              _damageVillageBuilding(b, p.damage);
               floatingTexts.add(
                 FloatingTextEntity(
                   position: b.position - const Offset(0, 25),
@@ -1461,41 +1967,49 @@ class GameEngine extends ChangeNotifier {
         CorpseEntity(
           position: enemy.position,
           sprite: enemy.config.sprite,
+          config: enemy.config,
           facingLeft: enemy.facingLeft,
+          isWaveEnemy: enemy.isWaveEnemy,
+          canBeRevived: enemy.canBeRevived,
+          healthScale: enemy.maxHealth / enemy.config.maxHealth,
+          damageScale: enemy.damageScale,
+          speedScale: enemy.speedScale,
         ),
       );
-      player.gold += enemy.config.goldReward;
-      player.score += enemy.config.scoreReward;
-      player.kills++;
-      player.addXp(enemy.config.xpReward);
+      if (enemy.grantsReward) {
+        player.gold += enemy.config.goldReward;
+        player.score += enemy.config.scoreReward;
+        player.kills++;
+        player.addXp(enemy.config.xpReward);
 
-      // Pasiva del Mago Arcano: Sifón de Maná (recupera vida al matar)
-      if (playerClass.type == PlayerRoleType.mage &&
-          player.unlockedSkillIds.contains('m_passive_1')) {
-        player.heal(15);
-      }
+        // Pasiva del Mago Arcano: Sifón de Maná (recupera vida al matar)
+        if (playerClass.type == PlayerRoleType.mage &&
+            player.unlockedSkillIds.contains('m_passive_1')) {
+          player.heal(15);
+        }
 
-      floatingTexts.add(
-        FloatingTextEntity(
-          position: enemy.position - const Offset(0, 45),
-          text:
-              '+${enemy.config.goldReward} 🪙 | +${enemy.config.scoreReward} XP',
-          color: const Color(0xFFFFD166),
-          fontSize: 13,
-        ),
-      );
+        floatingTexts.add(
+          FloatingTextEntity(
+            position: enemy.position - const Offset(0, 45),
+            text:
+                '+${enemy.config.goldReward} 🪙 | +${enemy.config.scoreReward} XP',
+            color: const Color(0xFFFFD166),
+            fontSize: 13,
+          ),
+        );
 
-      // Actualizar progreso de misiones activas de NPCs
-      for (final npc in npcs) {
-        final q = npc.activeQuest;
-        if (q != null && !q.isCompleted) {
-          q.currentKills++;
-          if (q.currentKills >= q.requiredEnemyKills) {
-            q.isCompleted = true;
-            showAnnouncement(
-              '¡MISIÓN LISTA PARA RECLAMAR EN EL GREMIO: ${q.title}!',
-            );
-            AudioEngine.playLevelUp();
+        // Actualizar progreso de misiones activas de NPCs
+        for (final npc in npcs) {
+          final q = npc.activeQuest;
+          if (q != null && !q.isCompleted) {
+            q.currentKills++;
+            if (q.currentKills >= q.requiredEnemyKills) {
+              q.isCompleted = true;
+              showAnnouncement(
+                '¡MISIÓN LISTA PARA RECLAMAR EN EL GREMIO: ${q.title}!',
+              );
+              AudioEngine.playLevelUp();
+            }
           }
         }
       }
@@ -1642,7 +2156,10 @@ class GameEngine extends ChangeNotifier {
   // OPERACIONES DE LA TIENDA DE LA ALDEA
   // ==========================================
   bool repairVillage(int cost, double hp) {
-    if (player.gold < cost) return false;
+    if (player.gold < cost) {
+      showTutorialForInsufficientGold();
+      return false;
+    }
     player.gold -= cost;
     townHall.repair(hp);
     for (final b in villageBuildings) {
@@ -1663,7 +2180,10 @@ class GameEngine extends ChangeNotifier {
   }
 
   bool upgradeHeroDamage(int cost) {
-    if (player.gold < cost) return false;
+    if (player.gold < cost) {
+      showTutorialForInsufficientGold();
+      return false;
+    }
     player.gold -= cost;
     player.damageMultiplier += 0.25;
     floatingTexts.add(
@@ -1679,7 +2199,10 @@ class GameEngine extends ChangeNotifier {
   }
 
   bool upgradeHeroSpeed(int cost) {
-    if (player.gold < cost) return false;
+    if (player.gold < cost) {
+      showTutorialForInsufficientGold();
+      return false;
+    }
     player.gold -= cost;
     player.speedMultiplier += 0.15;
     floatingTexts.add(
@@ -1695,7 +2218,10 @@ class GameEngine extends ChangeNotifier {
   }
 
   bool healHero(int cost) {
-    if (player.gold < cost) return false;
+    if (player.gold < cost) {
+      showTutorialForInsufficientGold();
+      return false;
+    }
     if (player.health >= player.maxHealth) return false;
     player.gold -= cost;
     player.heal(player.maxHealth * 0.6);

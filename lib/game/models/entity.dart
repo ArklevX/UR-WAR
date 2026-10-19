@@ -152,6 +152,9 @@ class EnemyEntity {
   final EnemyConfig config;
   Offset position;
   double health;
+  final double maxHealth;
+  final double damageScale;
+  final double speedScale;
   bool facingLeft = false;
   double attackTimer = 0.0;
   double hitFlashTimer = 0.0;
@@ -163,15 +166,31 @@ class EnemyEntity {
   int phase = 1;
   bool rewardGranted = false;
   bool isWaveEnemy;
+  final bool canBeRevived;
+  final bool grantsReward;
+  final String? guardLeaderId;
+  final Offset guardOffset;
+  double emergenceTimer;
 
   EnemyEntity({
     required this.id,
     required this.config,
     required this.position,
     this.isWaveEnemy = false,
-  }) : health = config.maxHealth;
+    this.canBeRevived = true,
+    this.grantsReward = true,
+    this.guardLeaderId,
+    this.guardOffset = Offset.zero,
+    this.emergenceTimer = 0,
+    double healthScale = 1,
+    this.damageScale = 1,
+    this.speedScale = 1,
+  }) : maxHealth = config.maxHealth * healthScale,
+       health = config.maxHealth * healthScale;
 
   bool get isDead => health <= 0;
+  double get attackDamage => config.attackDamage * damageScale;
+  double get movementSpeed => config.speed * speedScale;
 
   void takeDamage(double amount) {
     health = max(0, health - amount);
@@ -380,13 +399,27 @@ class HazardEntity {
 class CorpseEntity {
   final Offset position;
   final PixelSpriteData sprite;
+  final EnemyConfig config;
   final bool facingLeft;
+  final bool isWaveEnemy;
+  final bool canBeRevived;
+  final double healthScale;
+  final double damageScale;
+  final double speedScale;
   double lifeTime;
   final double maxLifeTime;
+  double reviveWindow;
   CorpseEntity({
     required this.position,
     required this.sprite,
+    required this.config,
     required this.facingLeft,
+    required this.isWaveEnemy,
+    required this.canBeRevived,
+    this.healthScale = 1,
+    this.damageScale = 1,
+    this.speedScale = 1,
     this.lifeTime = 0.65,
+    this.reviveWindow = 6.0,
   }) : maxLifeTime = lifeTime;
 }

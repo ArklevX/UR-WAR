@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../logic/game_engine.dart';
 import '../models/player_class.dart';
+import '../models/tutorial_hint.dart';
 import 'battle_minimap.dart';
 
 /// Readable status and utilities. Input and modal lifetimes belong to the screen.
@@ -219,6 +220,18 @@ class GameHUD extends StatelessWidget {
                   ],
                 ),
               ),
+              if (engine.activeTutorialHint != null)
+                Positioned(
+                  left: 12,
+                  right: compact ? 64 : 96,
+                  bottom: compact ? 108 : 132,
+                  child: TutorialHintPanel(
+                    hint: engine.activeTutorialHint!,
+                    compact: compact,
+                    onDismiss: engine.dismissTutorialHint,
+                    onDisable: engine.disableTutorialHints,
+                  ),
+                ),
             ],
           ),
         );
@@ -283,6 +296,108 @@ class GameHUD extends StatelessWidget {
             label: Text(badge ?? ''),
             child: Icon(icon, color: const Color(0xFFC7AD79), size: 22),
           ),
+        ),
+      ),
+    ),
+  );
+}
+
+class TutorialHintPanel extends StatelessWidget {
+  final TutorialHint hint;
+  final bool compact;
+  final VoidCallback onDismiss;
+  final VoidCallback onDisable;
+
+  const TutorialHintPanel({
+    super.key,
+    required this.hint,
+    required this.compact,
+    required this.onDismiss,
+    required this.onDisable,
+  });
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    liveRegion: true,
+    label: '${hint.title}. ${hint.message}',
+    child: Material(
+      color: Colors.transparent,
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 520),
+        padding: EdgeInsets.all(compact ? 8 : 11),
+        decoration: BoxDecoration(
+          color: const Color(0xF21A211C),
+          borderRadius: BorderRadius.circular(9),
+          border: Border.all(color: const Color(0xFFC7AD79), width: 1.2),
+          boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 12)],
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              hint.icon,
+              color: const Color(0xFFC7AD79),
+              size: compact ? 22 : 27,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    hint.title,
+                    style: TextStyle(
+                      color: const Color(0xFFC7AD79),
+                      fontFamily: 'Cinzel',
+                      fontWeight: FontWeight.bold,
+                      fontSize: compact ? 10 : 12,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    hint.message,
+                    maxLines: compact ? 3 : 4,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: compact ? 10 : 12,
+                      height: 1.25,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: [
+                      SizedBox(
+                        height: 28,
+                        child: FilledButton(
+                          key: const Key('tutorial-hint-dismiss'),
+                          onPressed: onDismiss,
+                          child: const Text(
+                            'Entendido',
+                            style: TextStyle(fontSize: 10),
+                          ),
+                        ),
+                      ),
+                      SizedBox(
+                        height: 28,
+                        child: TextButton(
+                          key: const Key('tutorial-hint-disable'),
+                          onPressed: onDisable,
+                          child: const Text(
+                            'No mostrar más',
+                            style: TextStyle(fontSize: 10),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     ),
