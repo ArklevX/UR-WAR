@@ -272,7 +272,7 @@ class SaveSystem {
         lastError = null;
       } catch (error) {
         lastError =
-            'No se pudo guardar el perfil. Revisa el almacenamiento disponible.';
+            'No se pudo guardar el perfil. Revisa tu almacenamiento disponible.';
         debugPrint('[SaveSystem] $error');
       }
     });
