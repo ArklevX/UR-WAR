@@ -148,7 +148,7 @@ class SaveSystem {
     } catch (error) {
       _data = SaveData();
       lastError =
-          'No se pudo cargar el perfil local. Revisa el almacenamiento disponible.';
+          'No se pudo cargar el perfil local. Revisa tu almacenamiento disponible.';
       debugPrint('[SaveSystem] $error');
     }
     _syncAudio();
@@ -307,7 +307,7 @@ class SaveSystem {
         lastError = null;
       } catch (error) {
         lastError =
-            'No se pudo guardar el perfil. Revisa el almacenamiento disponible.';
+            'No se pudo guardar el perfil. Revisa tu almacenamiento disponible.';
         debugPrint('[SaveSystem] $error');
       }
     });
