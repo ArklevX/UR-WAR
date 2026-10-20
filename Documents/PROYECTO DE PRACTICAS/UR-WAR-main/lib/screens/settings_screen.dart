@@ -246,67 +246,79 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.school_outlined),
-                  title: const Text('Volver a mostrar la guía inicial'),
+                  title: const Text('Volver a mostrar las guías'),
                   subtitle: const Text(
-                    'Se mostrará al comenzar tu siguiente defensa',
+                    'Reinicia la guía inicial y los consejos del nivel 1',
                   ),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () {
                     SaveSystem.setTutorialSeen(false);
+                    SaveSystem.resetTutorialHints();
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                        content: Text('Guía activada para la próxima partida.'),
+                        content: Text(
+                          'Guías activadas para la próxima partida.',
+                        ),
                       ),
                     );
                   },
                 ),
               ],
               if (_section == 2) ...[
-                _heading('TU CAMPAÑA'),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Wrap(
-                      spacing: 28,
-                      runSpacing: 18,
-                      children: [
-                        _stat(
-                          'Récord',
-                          '${d.highScore} PTS',
-                          Icons.emoji_events_outlined,
+                Center(
+                  child: Column(
+                    children: [
+                      _heading('TU CAMPAÑA'),
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Wrap(
+                            alignment: WrapAlignment.center,
+                            spacing: 28,
+                            runSpacing: 18,
+                            children: [
+                              _stat(
+                                'Récord',
+                                '${d.highScore} PTS',
+                                Icons.emoji_events_outlined,
+                              ),
+                              _stat(
+                                'Enemigos',
+                                '${d.totalKills}',
+                                Icons.shield_outlined,
+                              ),
+                              _stat(
+                                'Oro reunido',
+                                '${d.totalGoldGathered}',
+                                Icons.monetization_on_outlined,
+                              ),
+                              _stat(
+                                'Campaña',
+                                '${d.unlockedCampaignLevel} / 5',
+                                Icons.flag_outlined,
+                              ),
+                            ],
+                          ),
                         ),
-                        _stat(
-                          'Enemigos',
-                          '${d.totalKills}',
-                          Icons.shield_outlined,
+                      ),
+                      if (SaveSystem.lastError != null)
+                        Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Text(
+                            SaveSystem.lastError!,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(color: Colors.orangeAccent),
+                          ),
                         ),
-                        _stat(
-                          'Oro reunido',
-                          '${d.totalGoldGathered}',
-                          Icons.monetization_on_outlined,
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8),
+                        child: Text(
+                          'El progreso y los ajustes se guardan en este dispositivo. Las estrellas premian la victoria y la conservación de la aldea.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.white54, fontSize: 12),
                         ),
-                        _stat(
-                          'Campaña',
-                          '${d.unlockedCampaignLevel} / 5',
-                          Icons.flag_outlined,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                if (SaveSystem.lastError != null)
-                  Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Text(
-                      SaveSystem.lastError!,
-                      style: const TextStyle(color: Colors.orangeAccent),
-                    ),
-                  ),
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 8),
-                  child: Text(
-                    'El progreso y los ajustes se guardan en este dispositivo. Las estrellas premian la victoria y la conservación de la aldea.',
-                    style: TextStyle(color: Colors.white54, fontSize: 12),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -321,6 +333,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     padding: const EdgeInsets.only(top: 24, bottom: 10),
     child: Text(
       title,
+      textAlign: TextAlign.center,
       style: const TextStyle(
         color: AppTheme.accentColor,
         fontFamily: 'Cinzel',
@@ -332,15 +345,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _stat(String label, String value, IconData icon) => SizedBox(
     width: 130,
     child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Icon(icon, color: const Color(0xFFC7AD79)),
         const SizedBox(height: 8),
         Text(
           value,
+          textAlign: TextAlign.center,
           style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
         ),
-        Text(label, style: const TextStyle(color: Colors.white54)),
+        Text(
+          label,
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: Colors.white54),
+        ),
       ],
     ),
   );

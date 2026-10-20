@@ -57,6 +57,11 @@ class WaveSystem {
     if (wave >= 2) {
       roster.addAll(List.generate(1 + wave ~/ 2, (_) => EnemyConfig.orc));
     }
+    if (wave >= 3) {
+      roster.addAll(
+        List.generate(1 + (wave - 3) ~/ 2, (_) => EnemyConfig.troll),
+      );
+    }
     if (wave >= 3 && biome != MapBiomeType.snow) {
       roster.addAll(List.generate(wave ~/ 2, (_) => EnemyConfig.skeleton));
     }
@@ -64,6 +69,9 @@ class WaveSystem {
       roster.addAll(
         List.generate(max(1, wave ~/ 3), (_) => EnemyConfig.necromancer),
       );
+    }
+    if (level == 1 && wave == max(3, maxWaves - 1)) {
+      roster.insert(0, EnemyConfig.necromancerMiniboss);
     }
     if (wave == maxWaves) {
       roster.insert(0, EnemyConfig.bossForBiome(biome.name, level));

@@ -152,6 +152,9 @@ class EnemyEntity {
   final EnemyConfig config;
   Offset position;
   double health;
+  final double maxHealth;
+  final double damageScale;
+  final double speedScale;
   bool facingLeft = false;
   double attackTimer = 0.0;
   double hitFlashTimer = 0.0;
@@ -163,20 +166,58 @@ class EnemyEntity {
   int phase = 1;
   bool rewardGranted = false;
   bool isWaveEnemy;
+  final bool canBeRevived;
+  final bool grantsReward;
+  final String? guardLeaderId;
+  final Offset guardOffset;
+  double emergenceTimer;
+  double vulnerableTimer = 0;
+  int abilityCastCount = 0;
 
   EnemyEntity({
     required this.id,
     required this.config,
     required this.position,
     this.isWaveEnemy = false,
-  }) : health = config.maxHealth;
+    this.canBeRevived = true,
+    this.grantsReward = true,
+    this.guardLeaderId,
+    this.guardOffset = Offset.zero,
+    this.emergenceTimer = 0,
+    double healthScale = 1,
+    this.damageScale = 1,
+    this.speedScale = 1,
+  }) : maxHealth = config.maxHealth * healthScale,
+       health = config.maxHealth * healthScale;
 
   bool get isDead => health <= 0;
+  double get attackDamage => config.attackDamage * damageScale;
+  double get movementSpeed => config.speed * speedScale;
 
   void takeDamage(double amount) {
     health = max(0, health - amount);
     hitFlashTimer = 0.2;
   }
+}
+
+/// Heavy ground projectile used by titan-type bosses.
+class RollingRockEntity {
+  Offset position;
+  final Offset velocity;
+  final double damage;
+  final double radius;
+  double lifeTime;
+  double rotation = 0;
+
+  RollingRockEntity({
+    required this.position,
+    required this.velocity,
+    required this.damage,
+    this.radius = 20,
+    this.lifeTime = 4.5,
+  });
+
+  bool get isExpired => lifeTime <= 0;
 }
 
 enum BuildingType {
@@ -359,6 +400,7 @@ class HazardEntity {
   final String type;
   double delay, duration;
   final double initialDelay;
+  final double initialDuration;
   double tickTimer = 0;
   bool triggered = false;
   HazardEntity({
@@ -370,23 +412,40 @@ class HazardEntity {
     this.type = 'impact',
     this.delay = 1.2,
     this.duration = 0.35,
-  }) : initialDelay = delay;
+  }) : initialDelay = delay,
+       initialDuration = duration;
   bool get isWarning => delay > 0;
   bool get isActive => delay <= 0 && duration > 0;
   double get warningProgress =>
       initialDelay <= 0 ? 1 : (1 - delay / initialDelay).clamp(0, 1);
+  double get activeProgress =>
+      initialDuration <= 0 ? 1 : (1 - duration / initialDuration).clamp(0, 1);
 }
 
 class CorpseEntity {
   final Offset position;
   final PixelSpriteData sprite;
+  final EnemyConfig config;
   final bool facingLeft;
+  final bool isWaveEnemy;
+  final bool canBeRevived;
+  final double healthScale;
+  final double damageScale;
+  final double speedScale;
   double lifeTime;
   final double maxLifeTime;
+  double reviveWindow;
   CorpseEntity({
     required this.position,
     required this.sprite,
+    required this.config,
     required this.facingLeft,
+    required this.isWaveEnemy,
+    required this.canBeRevived,
+    this.healthScale = 1,
+    this.damageScale = 1,
+    this.speedScale = 1,
     this.lifeTime = 0.65,
+    this.reviveWindow = 6.0,
   }) : maxLifeTime = lifeTime;
 }

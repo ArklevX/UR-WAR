@@ -134,6 +134,11 @@ class AudioEngine {
   static void playCoin() => _play('coin');
   static void playLevelUp() => _play('levelup');
   static void playSpecialSkill() => _play('special');
+  static void playBossAbility() => _play('special');
+  static void playResurrection() => _play('levelup');
+  static void playMagicImpact() => _play('hit');
+  static void playRockLaunch() => _play('shoot');
+  static void playRockImpact() => _play('hit');
   static void playVictory() => _play('victory');
   static void playDefeat() => _play('defeat');
   static Future<void> dispose() async {

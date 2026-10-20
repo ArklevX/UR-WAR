@@ -1,7 +1,38 @@
 import 'package:flutter/material.dart';
 import '../graphics/pixel_art_data.dart';
 
-enum EnemyCategory { goblin, orc, skeleton, necromancer, bossTitan }
+enum EnemyCategory {
+  goblin,
+  orc,
+  troll,
+  skeleton,
+  necromancer,
+  necromancerMiniboss,
+  bossTitan,
+}
+
+/// High-level strategy used by the enemy AI controller.
+enum EnemyBehavior { raider, siege, rangedKiter, support, miniboss }
+
+enum EnemyAbility {
+  none,
+  areaStrike,
+  healOrRevive,
+  diamondResurrection,
+  titanArsenal,
+  frostStorm,
+  lavaBurst,
+}
+
+/// Ordered preferences that future targeting rules can score independently.
+enum TargetPriority {
+  player,
+  townHall,
+  defenses,
+  resources,
+  woundedAlly,
+  fallenAlly,
+}
 
 class EnemyConfig {
   final EnemyCategory category;
@@ -19,6 +50,12 @@ class EnemyConfig {
   final double hitRadius;
   final PixelSpriteData sprite;
   final Color healthBarColor;
+  final EnemyBehavior behavior;
+  final double preferredRange;
+  final double retreatRange;
+  final double abilityCooldownSeconds;
+  final EnemyAbility ability;
+  final List<TargetPriority> targetPriorities;
 
   const EnemyConfig({
     required this.category,
@@ -36,6 +73,16 @@ class EnemyConfig {
     required this.hitRadius,
     required this.sprite,
     this.healthBarColor = const Color(0xFFEF233C),
+    this.behavior = EnemyBehavior.raider,
+    this.preferredRange = 0,
+    this.retreatRange = 0,
+    this.abilityCooldownSeconds = 0,
+    this.ability = EnemyAbility.none,
+    this.targetPriorities = const [
+      TargetPriority.player,
+      TargetPriority.defenses,
+      TargetPriority.townHall,
+    ],
   });
 
   static EnemyConfig get goblin => EnemyConfig(
@@ -53,6 +100,14 @@ class EnemyConfig {
     isBoss: false,
     hitRadius: 20,
     sprite: PixelArtLibrary.goblin,
+    behavior: EnemyBehavior.raider,
+    preferredRange: 32,
+    targetPriorities: const [
+      TargetPriority.resources,
+      TargetPriority.defenses,
+      TargetPriority.townHall,
+      TargetPriority.player,
+    ],
   );
 
   static EnemyConfig get orc => EnemyConfig(
@@ -70,6 +125,39 @@ class EnemyConfig {
     isBoss: false,
     hitRadius: 28,
     sprite: PixelArtLibrary.orc,
+    behavior: EnemyBehavior.raider,
+    preferredRange: 40,
+    targetPriorities: const [
+      TargetPriority.player,
+      TargetPriority.defenses,
+      TargetPriority.townHall,
+    ],
+  );
+
+  static EnemyConfig get troll => EnemyConfig(
+    category: EnemyCategory.troll,
+    name: 'Troll de las Cavernas',
+    maxHealth: 320,
+    speed: 70,
+    attackDamage: 40,
+    attackRange: 44,
+    attackCooldownSeconds: 1.6,
+    goldReward: 60,
+    scoreReward: 120,
+    xpReward: 40,
+    isRanged: false,
+    isBoss: false,
+    hitRadius: 32,
+    sprite: PixelArtLibrary.troll,
+    healthBarColor: const Color(0xFF63B3ED),
+    behavior: EnemyBehavior.siege,
+    preferredRange: 44,
+    abilityCooldownSeconds: 7,
+    targetPriorities: const [
+      TargetPriority.defenses,
+      TargetPriority.townHall,
+      TargetPriority.player,
+    ],
   );
 
   static EnemyConfig get skeleton => EnemyConfig(
@@ -87,6 +175,14 @@ class EnemyConfig {
     isBoss: false,
     hitRadius: 22,
     sprite: PixelArtLibrary.skeleton,
+    behavior: EnemyBehavior.rangedKiter,
+    preferredRange: 210,
+    retreatRange: 120,
+    targetPriorities: const [
+      TargetPriority.player,
+      TargetPriority.defenses,
+      TargetPriority.townHall,
+    ],
   );
 
   static EnemyConfig get necromancer => EnemyConfig(
@@ -104,6 +200,45 @@ class EnemyConfig {
     isBoss: false,
     hitRadius: 24,
     sprite: PixelArtLibrary.necromancer,
+    behavior: EnemyBehavior.support,
+    preferredRange: 220,
+    retreatRange: 140,
+    abilityCooldownSeconds: 8,
+    ability: EnemyAbility.healOrRevive,
+    targetPriorities: const [
+      TargetPriority.fallenAlly,
+      TargetPriority.woundedAlly,
+      TargetPriority.player,
+      TargetPriority.defenses,
+    ],
+  );
+
+  static EnemyConfig get necromancerMiniboss => EnemyConfig(
+    category: EnemyCategory.necromancerMiniboss,
+    name: 'MALACHAR, SEÑOR DE LAS TUMBAS',
+    maxHealth: 620,
+    speed: 68,
+    attackDamage: 38,
+    attackRange: 285,
+    attackCooldownSeconds: 1.7,
+    goldReward: 150,
+    scoreReward: 380,
+    xpReward: 110,
+    isRanged: true,
+    isBoss: true,
+    hitRadius: 36,
+    sprite: PixelArtLibrary.necromancer,
+    healthBarColor: const Color(0xFF70E000),
+    behavior: EnemyBehavior.miniboss,
+    preferredRange: 240,
+    retreatRange: 150,
+    abilityCooldownSeconds: 10,
+    ability: EnemyAbility.diamondResurrection,
+    targetPriorities: const [
+      TargetPriority.player,
+      TargetPriority.defenses,
+      TargetPriority.townHall,
+    ],
   );
 
   static EnemyConfig get bossTitan => EnemyConfig(
@@ -122,6 +257,15 @@ class EnemyConfig {
     hitRadius: 45,
     sprite: PixelArtLibrary.bossTitan,
     healthBarColor: const Color(0xFFFF9F1C),
+    behavior: EnemyBehavior.miniboss,
+    preferredRange: 60,
+    abilityCooldownSeconds: 6,
+    ability: EnemyAbility.titanArsenal,
+    targetPriorities: const [
+      TargetPriority.defenses,
+      TargetPriority.player,
+      TargetPriority.townHall,
+    ],
   );
 
   static EnemyConfig bossForBiome(String biome, int level) => EnemyConfig(
@@ -150,5 +294,18 @@ class EnemyConfig {
     healthBarColor: biome == 'snow'
         ? const Color(0xFF63DDFF)
         : const Color(0xFFFF9F1C),
+    behavior: EnemyBehavior.miniboss,
+    preferredRange: 70,
+    abilityCooldownSeconds: 6,
+    ability: biome == 'snow'
+        ? EnemyAbility.frostStorm
+        : biome == 'lava'
+        ? EnemyAbility.lavaBurst
+        : EnemyAbility.titanArsenal,
+    targetPriorities: const [
+      TargetPriority.defenses,
+      TargetPriority.player,
+      TargetPriority.townHall,
+    ],
   );
 }
