@@ -52,7 +52,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
       const SizedBox(width: 220, child: _CrestRule()),
       const SizedBox(height: 14),
       const Text(
-        'Defiende. Explora. Reconquista.',
+        'Defiende. Explora. Reconquista. Diviertete',
         style: TextStyle(color: _gold, fontSize: 12, letterSpacing: .6),
       ),
     ],
