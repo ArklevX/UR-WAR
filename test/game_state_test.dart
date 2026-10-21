@@ -31,5 +31,16 @@ void main() {
       expect(game.canAttackAt(2, 1), isFalse);
       expect(game.canMoveTo(1, 2), isFalse);
     });
+
+    test('moving against the board edge keeps the robot selected', () {
+      game.moveInDirection(-1, 0);
+      game.moveInDirection(-1, 0);
+      final apBefore = game.selectedRobot!.actionPoints;
+
+      game.moveInDirection(-1, 0);
+
+      expect(game.selectedRobotId, 'player_1');
+      expect(game.selectedRobot!.actionPoints, apBefore);
+    });
   });
 }

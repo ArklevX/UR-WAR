@@ -245,6 +245,7 @@ class GameState extends ChangeNotifier {
       final selectedRobot = robots.firstWhere((r) => r.id == selectedRobotId);
       final targetX = (selectedRobot.x + dx).clamp(0, boardSize - 1);
       final targetY = (selectedRobot.y + dy).clamp(0, boardSize - 1);
+      if (targetX == selectedRobot.x && targetY == selectedRobot.y) return;
       onCellTapped(targetX, targetY);
     }
   }
