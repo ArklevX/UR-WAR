@@ -129,43 +129,47 @@ class GameEngine extends ChangeNotifier {
     );
 
     // Crear el Salón Comunal (Corazón de la aldea)
+    // ajuste temporal, antes 50, era demasiado grande, entorpecia el movimiento por el mapa
     townHall = VillageBuildingEntity(
       id: 'town_hall',
       type: BuildingType.townHall,
       position: Offset(centerX, centerY),
       maxHealth: 1200,
-      radius: 50,
+      radius: 25,
     );
     villageBuildings.add(townHall);
 
     // Torres de vigilancia defensivas iniciales
+    // ajuste temporal, antes 35, era demasiado grande, entorpecia el movimiento por el mapa
     villageBuildings.add(
       VillageBuildingEntity(
         id: 'tower_nw',
         type: BuildingType.watchtower,
         position: Offset(centerX - 160, centerY - 120),
         maxHealth: 500,
-        radius: 35,
+        radius: 15,
       ),
     );
+    // ajuste temporal, antes 35, era demasiado grande, entorpecia el movimiento por el mapa
     villageBuildings.add(
       VillageBuildingEntity(
         id: 'tower_se',
         type: BuildingType.watchtower,
         position: Offset(centerX + 160, centerY + 120),
         maxHealth: 500,
-        radius: 35,
+        radius: 15,
       ),
     );
 
     // Cabañas iniciales
+    // ajuste temporal, antes 35, era demasiado grande, entorpecia el movimiento por el mapa
     villageBuildings.add(
       VillageBuildingEntity(
         id: 'cottage_ne',
         type: BuildingType.cottage,
         position: Offset(centerX + 140, centerY - 110),
         maxHealth: 350,
-        radius: 35,
+        radius: 20,
       ),
     );
 

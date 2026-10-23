@@ -55,7 +55,8 @@ void main() {
       ),
     );
     final hp = engine.townHall.health;
-    engine.update(.05);
+    // al disminuir el radio es normal que se necesite algo mas de tiempo para atacar
+    engine.update(.1);
     expect(engine.townHall.health, lessThan(hp));
   });
 
@@ -362,7 +363,8 @@ void main() {
         position: engine.townHall.position + const Offset(70, 0),
       ),
     );
-    engine.update(.05);
+    // al disminuir el radio es normal que se necesite algo mas de tiempo para atacar
+    engine.update(.1);
     expect(engine.activeTutorialHint?.id, 'level1_town_hall_under_attack');
     engine.dismissTutorialHint();
 
