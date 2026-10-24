@@ -321,9 +321,9 @@ class PixelArtLibrary {
     palette: {
       '.': cTrans,
       '#': cBlack,
-      'g': const Color(0xFF386641), // Verde orco oscuro
-      'G': const Color(0xFF6A994E), // Verde orco músculo
-      'r': const Color(0xFFBC4749), // Pintura de guerra roja
+      'g': const Color(0xFF9B2226), // Orco rojo oscuro
+      'G': const Color(0xFFE5383B), // Piel roja clara
+      'r': const Color(0xFFFF6B6B), // Pintura de guerra roja
       'h': const Color(0xFF4A4E69), // Casco con pinchos
       'e': const Color(0xFFFFD166), // Ojos amarillos furia
       'w': Colors.white, // Colmillos
@@ -382,10 +382,10 @@ class PixelArtLibrary {
     palette: {
       '.': cTrans,
       '#': cBlack,
-      'b': const Color(0xFFE8E8E8), // Hueso blanco
-      'B': const Color(0xFFF5F5F5), // Hueso brillo
-      's': const Color(0xFFAAAAAA), // Hueso sombra
-      'e': const Color(0xFFFF0054), // Ojo espectral rojo
+      'b': const Color(0xFFBDE0FE), // Huesos azul hielo
+      'B': const Color(0xFFEFF6FF), // Huesos casi blancos
+      's': const Color(0xFF669BBC), 
+      'e': const Color(0xFF00B4D8), 
       'c': const Color(0xFF4A4E69), // Harapos / Capa
       'w': const Color(0xFF8B5A2B), // Arco de madera
       'S': Colors.white, // Cuerda
@@ -420,14 +420,14 @@ class PixelArtLibrary {
     palette: {
       '.': cTrans,
       '#': cBlack,
-      'r': const Color(0xFF240046), // Túnica oscura
-      'R': const Color(0xFF3C096C), // Púrpura sombrío
-      'k': const Color(0xFFD8F3DC), // Rostro cadavérico pálido
-      'e': const Color(0xFF70E000), // Ojos verde fuego vil
-      'm': const Color(0xFF5A189A), // Manto
-      'g': const Color(0xFF38B000), // Orbe verde vil flotante
-      'G': const Color(0xFF70E000),
-      's': const Color(0xFF4A4E69), // Báculo de hueso
+    'r': const Color(0xFF14532D), // Túnica verde oscura 
+    'R': const Color(0xFF166534), // Sombra verde
+    'k': const Color(0xFFD8F3DC), // Rostro pálido
+    'e': const Color(0xFF4DFF4D), // Ojos verde brillante
+    'm': const Color(0xFF15803D), // Manto verde
+    'g': const Color(0xFF22C55E), // Esfera verde
+    'G': const Color(0xFF86EFAC), // Verde claro
+    's': const Color(0xFF365314), // Báculo verde oscuro
     },
     matrix: [
       '.....######.....',
