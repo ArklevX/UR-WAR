@@ -123,7 +123,7 @@ class _Illustrator {
         : ranger
         ? const Color(0xFF3D5140)
         : mage
-        ? const Color(0xFF564362)
+        ? const Color(0xFF14532D)
         : cleric
         ? const Color(0xFFDED6BC)
         : ghost
@@ -131,11 +131,11 @@ class _Illustrator {
         : boss
         ? const Color(0xFF5D5148)
         : orc
-        ? const Color(0xFF556244)
+        ? const Color(0xFF9B2226)
         : goblin
         ? const Color(0xFF687050)
         : skeleton
-        ? const Color(0xFFBCB7A1)
+        ? const Color(0xFFBDE0FE)
         : const Color(0xFF786749);
     final cape = knight ? const Color(0xFF692F2E) : Color.lerp(body, ink, .4)!;
     final gait = d.moving ? sin(d.phase) * 9 : 0.0;
