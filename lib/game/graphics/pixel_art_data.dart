@@ -365,7 +365,7 @@ class PixelArtLibrary {
       '.': cTrans,
       '#': cBlack,
       'b': const Color(0xFFBDE0FE), // Huesos azul hielo
-      'B': const Color(0FFEFF6FF), // Huesos casi blancos
+      'B': const Color(0xFFEFF6FF), // Huesos casi blancos
       's': const Color(0xFF669BBC), 
       'e': const Color(0xFF00B4D8), 
       'c': const Color(0xFF4A4E69), // Harapos / Capa
