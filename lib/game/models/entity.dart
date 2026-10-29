@@ -19,7 +19,6 @@ class PlayerEntity {
   double hitFlashTimer = 0.0;
   double walkPhase = 0.0;
   bool isMoving = false;
-  Offset? targetDestination;
   Offset aimDirection = const Offset(1, 0);
   Offset moveDirection = const Offset(1, 0);
   Offset dashDirection = const Offset(1, 0);
@@ -398,6 +397,8 @@ class HazardEntity {
   final Color color;
   final bool isFriendly;
   final String type;
+  final Offset direction;
+  final double arcRadians;
   double delay, duration;
   final double initialDelay;
   final double initialDuration;
@@ -410,6 +411,8 @@ class HazardEntity {
     required this.color,
     this.isFriendly = false,
     this.type = 'impact',
+    this.direction = Offset.zero,
+    this.arcRadians = 2 * pi,
     this.delay = 1.2,
     this.duration = 0.35,
   }) : initialDelay = delay,
