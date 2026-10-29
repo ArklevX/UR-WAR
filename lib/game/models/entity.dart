@@ -172,6 +172,11 @@ class EnemyEntity {
   double emergenceTimer;
   double vulnerableTimer = 0;
   int abilityCastCount = 0;
+  Offset? dragonFlightTarget;
+  double dragonFlightDelay = 0;
+  int dragonPerchIndex = -1;
+  int dragonCloseAttackCount = 0;
+  int dragonRangedAttackCount = 0;
 
   EnemyEntity({
     required this.id,
@@ -190,6 +195,7 @@ class EnemyEntity {
        health = config.maxHealth * healthScale;
 
   bool get isDead => health <= 0;
+  bool get isFlying => dragonFlightTarget != null && dragonFlightDelay <= 0;
   double get attackDamage => config.attackDamage * damageScale;
   double get movementSpeed => config.speed * speedScale;
 

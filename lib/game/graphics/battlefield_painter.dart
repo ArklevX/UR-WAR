@@ -551,8 +551,38 @@ class BattlefieldPainter extends CustomPainter {
     final emergenceProgress = emerging
         ? (1 - enemy.emergenceTimer / 1.2).clamp(0.0, 1.0)
         : 1.0;
+    final flying = enemy.isFlying;
+    final flightHeight = flying ? 42 + sin(engine.elapsedTime * 8) * 6 : 0.0;
     final renderPosition =
-        enemy.position + Offset(0, (1 - emergenceProgress) * 28);
+        enemy.position + Offset(0, (1 - emergenceProgress) * 28 - flightHeight);
+    if (flying) {
+      canvas.drawOval(
+        Rect.fromCenter(
+          center: enemy.position + const Offset(0, 18),
+          width: 76,
+          height: 24,
+        ),
+        Paint()..color = Colors.black.withValues(alpha: .32),
+      );
+      final wingLift = sin(engine.elapsedTime * 11) * 10;
+      final wingPaint = Paint()..color = const Color(0xFF9D2418);
+      canvas.drawPath(
+        Path()
+          ..moveTo(renderPosition.dx - 8, renderPosition.dy - 9)
+          ..lineTo(renderPosition.dx - 64, renderPosition.dy - 30 - wingLift)
+          ..lineTo(renderPosition.dx - 42, renderPosition.dy + 12)
+          ..close(),
+        wingPaint,
+      );
+      canvas.drawPath(
+        Path()
+          ..moveTo(renderPosition.dx + 8, renderPosition.dy - 9)
+          ..lineTo(renderPosition.dx + 64, renderPosition.dy - 30 - wingLift)
+          ..lineTo(renderPosition.dx + 42, renderPosition.dy + 12)
+          ..close(),
+        wingPaint,
+      );
+    }
     if (emerging) {
       canvas.drawOval(
         Rect.fromCenter(
@@ -600,7 +630,7 @@ class BattlefieldPainter extends CustomPainter {
           ..strokeWidth = 2,
       );
     }
-    if (enemy.vulnerableTimer > 0) {
+    if (enemy.vulnerableTimer > 0 && !flying) {
       final pulse = .65 + sin(engine.elapsedTime * 12) * .25;
       canvas.drawCircle(
         enemy.position,
@@ -621,7 +651,7 @@ class BattlefieldPainter extends CustomPainter {
     if (enemy.health < enemy.maxHealth || config.isBoss) {
       _health(
         canvas,
-        enemy.position - Offset(0, config.isBoss ? 65 : 39),
+        enemy.position - Offset(0, (config.isBoss ? 65 : 39) + flightHeight),
         config.isBoss ? 94 : 30,
         enemy.health,
         enemy.maxHealth,
@@ -631,8 +661,10 @@ class BattlefieldPainter extends CustomPainter {
     if (config.isBoss) {
       _label(
         canvas,
-        '${config.name} · FASE ${enemy.phase}',
-        enemy.position - const Offset(0, 81),
+        flying
+            ? '${config.name} · VOLANDO'
+            : '${config.name} · FASE ${enemy.phase}',
+        enemy.position - Offset(0, flying ? 125 : 81),
         const Color(0xFFFFD397),
         size: 10,
         maxWidth: 190,

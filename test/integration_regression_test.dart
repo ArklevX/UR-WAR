@@ -178,7 +178,7 @@ void main() {
     expect(engine.announcementBanner, contains('AVALANCHA'));
   });
 
-  test('Final dragon rotates through its four signature attacks', () {
+  test('Final dragon alternates attacks based on player distance', () {
     final dragon = EnemyEntity(
       id: 'final-dragon',
       config: EnemyConfig.finalDragon(1),
@@ -186,20 +186,66 @@ void main() {
     )..abilityTimer = 0;
     engine.enemies.add(dragon);
 
-    const expectedTypes = [
-      'dragonFireWave',
-      'dragonStomp',
-      'dragonIceBreath',
-      'dragonTail',
-    ];
-    for (final expectedType in expectedTypes) {
-      dragon.abilityTimer = 0;
-      engine.update(.05);
-      expect(engine.hazards.last.type, expectedType);
-    }
+    engine.update(.05);
+    expect(engine.hazards.last.type, 'dragonFireWave');
+    expect(engine.dragonPerches, contains(dragon.dragonFlightTarget));
+
+    dragon.dragonFlightTarget = null;
+    dragon.dragonFlightDelay = 0;
+    dragon.abilityTimer = 0;
+    engine.update(.05);
+    expect(engine.hazards.last.type, 'dragonIceBreath');
+
+    dragon.position = engine.player.position + const Offset(100, 0);
+    dragon.dragonFlightTarget = null;
+    dragon.dragonFlightDelay = 0;
+    dragon.abilityTimer = 0;
+    engine.update(.05);
+    expect(engine.hazards.last.type, 'dragonStomp');
+
+    dragon.dragonFlightTarget = null;
+    dragon.dragonFlightDelay = 0;
+    dragon.abilityTimer = 0;
+    engine.update(.05);
+    expect(engine.hazards.last.type, 'dragonTail');
+
     final fire = engine.hazards.first;
     expect(fire.arcRadians, closeTo(pi, .001));
     expect(fire.direction.distance, closeTo(1, .001));
+  });
+
+  test('Dragon flies between spawn perches and evades attacks in flight', () {
+    final dragon =
+        EnemyEntity(
+            id: 'flying-dragon',
+            config: EnemyConfig.finalDragon(1),
+            position: engine.player.position + const Offset(400, 0),
+          )
+          ..abilityTimer = 99
+          ..dragonFlightTarget = engine.dragonPerches.first
+          ..dragonFlightDelay = 0;
+    engine.enemies.add(dragon);
+    final health = dragon.health;
+    final position = dragon.position;
+    engine.projectiles.add(
+      ProjectileEntity(
+        position: dragon.position,
+        velocity: Offset.zero,
+        damage: 100,
+        color: Colors.white,
+        isFromPlayer: true,
+      ),
+    );
+
+    engine.update(.05);
+
+    expect(dragon.isFlying, isTrue);
+    expect(dragon.position, isNot(position));
+    expect(dragon.health, health);
+    expect(
+      engine.floatingTexts.any((text) => text.text.contains('EVADIÓ')),
+      isTrue,
+    );
   });
 
   test('Dragon stomp damages and pushes nearby players away', () {

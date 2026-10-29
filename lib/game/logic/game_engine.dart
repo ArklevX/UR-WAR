@@ -49,6 +49,12 @@ class GameEngine extends ChangeNotifier {
   Offset? get objectivePosition => map.biome == MapBiomeType.snow
       ? townHall.position + const Offset(360, -240)
       : null;
+  List<Offset> get dragonPerches => [
+    Offset(map.worldWidth / 2, 120),
+    Offset(map.worldWidth - 120, map.worldHeight / 2),
+    Offset(map.worldWidth / 2, map.worldHeight - 120),
+    Offset(120, map.worldHeight / 2),
+  ];
   bool get objectiveComplete =>
       objectivePosition == null || objectiveProgress >= 1;
   String get objectiveText {
@@ -1514,6 +1520,10 @@ class GameEngine extends ChangeNotifier {
       if (enemy.isDead) continue;
       _updateEnemyTimers(enemy, dt);
       if (enemy.emergenceTimer > 0) continue;
+      if (enemy.config.category == EnemyCategory.bossDragon &&
+          _updateDragonFlight(enemy, dt)) {
+        continue;
+      }
       if (_maintainGuardFormation(enemy, dt)) continue;
       _tryEnemyAbility(enemy, dt);
       final target =
@@ -1550,6 +1560,56 @@ class GameEngine extends ChangeNotifier {
     enemy.slowTimer = max(0, enemy.slowTimer - dt);
     enemy.emergenceTimer = max(0, enemy.emergenceTimer - dt);
     enemy.vulnerableTimer = max(0, enemy.vulnerableTimer - dt);
+  }
+
+  bool _updateDragonFlight(EnemyEntity dragon, double dt) {
+    final target = dragon.dragonFlightTarget;
+    if (target == null) return false;
+    if (dragon.dragonFlightDelay > 0) {
+      dragon.dragonFlightDelay = max(0, dragon.dragonFlightDelay - dt);
+      if (dragon.dragonFlightDelay == 0) {
+        showAnnouncement('¡${dragon.config.name} ALZA VUELO!', 1.8);
+        AudioEngine.playBossAbility();
+      }
+      return true;
+    }
+
+    final difference = target - dragon.position;
+    if (difference.distance <= 18) {
+      dragon.position = target;
+      dragon.dragonFlightTarget = null;
+      dragon.abilityTimer = .75;
+      _spawnExplosionParticles(
+        dragon.position,
+        dragon.config.healthBarColor,
+        18,
+      );
+      AudioEngine.playRockImpact();
+      showAnnouncement('¡EL DRAGÓN ATERRIZA Y PREPARA OTRO ATAQUE!', 1.8);
+      return true;
+    }
+
+    final direction = difference / difference.distance;
+    final speed = dragon.phase == 2 ? 760.0 : 650.0;
+    dragon.position += direction * min(difference.distance, speed * dt);
+    dragon.facingLeft = direction.dx < 0;
+    return true;
+  }
+
+  void _scheduleDragonFlight(EnemyEntity dragon) {
+    final indexedPerches =
+        dragonPerches.indexed
+            .where((entry) => entry.$1 != dragon.dragonPerchIndex)
+            .toList()
+          ..sort(
+            (a, b) => (b.$2 - player.position).distance.compareTo(
+              (a.$2 - player.position).distance,
+            ),
+          );
+    final destination = indexedPerches.first;
+    dragon.dragonPerchIndex = destination.$1;
+    dragon.dragonFlightTarget = destination.$2;
+    dragon.dragonFlightDelay = .9;
   }
 
   void _updateRollingRocks(double dt) {
@@ -1697,14 +1757,23 @@ class GameEngine extends ChangeNotifier {
         : const Offset(1, 0);
     enemy.facingLeft = direction.dx < 0;
     enemy.abilityCastCount++;
-    final attack = (enemy.abilityCastCount - 1) % 4;
+    final playerDistance = (player.position - enemy.position).distance;
+    final playerIsClose = playerDistance <= (enemy.phase == 2 ? 210 : 180);
+    final int attack;
+    if (playerIsClose) {
+      attack = enemy.dragonCloseAttackCount.isEven ? 1 : 3;
+      enemy.dragonCloseAttackCount++;
+    } else {
+      attack = enemy.dragonRangedAttackCount.isEven ? 0 : 2;
+      enemy.dragonRangedAttackCount++;
+    }
     switch (attack) {
       case 0:
         showAnnouncement('¡OLA DE FUEGO! Rodea al dragón para evitarla', 2.4);
         hazards.add(
           HazardEntity(
             position: enemy.position,
-            radius: enemy.phase == 2 ? 315 : 275,
+            radius: max(enemy.phase == 2 ? 315.0 : 275.0, playerDistance + 70),
             damage: enemy.attackDamage * 1.15,
             color: const Color(0xFFFF5A1F),
             delay: 1.15,
@@ -1734,7 +1803,7 @@ class GameEngine extends ChangeNotifier {
         hazards.add(
           HazardEntity(
             position: enemy.position,
-            radius: enemy.phase == 2 ? 290 : 250,
+            radius: max(enemy.phase == 2 ? 290.0 : 250.0, playerDistance + 55),
             damage: enemy.attackDamage * .7,
             color: const Color(0xFF72DDF7),
             delay: 1.05,
@@ -1764,6 +1833,7 @@ class GameEngine extends ChangeNotifier {
     AudioEngine.playBossAbility();
     _openBossWeakPoint(enemy);
     _setBossCooldown(enemy);
+    _scheduleDragonFlight(enemy);
   }
 
   void _launchRollingRocks(EnemyEntity enemy) {
@@ -2312,6 +2382,17 @@ class GameEngine extends ChangeNotifier {
 
   void _damageEnemy(EnemyEntity enemy, double amount, {bool isCrit = false}) {
     if (enemy.isDead || enemy.rewardGranted || amount <= 0) return;
+    if (enemy.isFlying) {
+      floatingTexts.add(
+        FloatingTextEntity(
+          position: enemy.position - const Offset(0, 55),
+          text: '¡EVADIÓ EN VUELO!',
+          color: const Color(0xFFBDEBFF),
+          fontSize: 13,
+        ),
+      );
+      return;
+    }
     final effectiveAmount = amount * (enemy.vulnerableTimer > 0 ? 1.5 : 1);
     final previousHealth = enemy.health;
     enemy.takeDamage(effectiveAmount);
